@@ -1,49 +1,55 @@
 'use strict';
 
 exports.main = async (event, context) => {
-	const { code, userInfo } = event
+	const { deviceId, userInfo } = event
 
 	try {
+		if (!deviceId || !userInfo) {
+			return {
+				code: -1,
+				msg: '参数错误：设备ID和用户信息不能为空'
+			}
+		}
+
 		// 获取数据库引用
 		const db = uniCloud.database()
 		const usersCollection = db.collection('users')
 
-		// 通过code获取openid
-		const res = await uniCloud.getWXContext()
-		const openid = res.OPENID
-
-		if (!openid) {
-			return {
-				code: -1,
-				msg: '获取openid失败'
-			}
-		}
-
-		// 查询用户是否存在
+		// 使用设备ID作为唯一标识
+		// 这样可以保证同一设备的用户数据一致性
 		const userRes = await usersCollection.where({
-			openid: openid
+			deviceId: deviceId
 		}).get()
 
 		let userId
+		let userData
 
 		if (userRes.data.length === 0) {
 			// 新用户，创建记录
 			const addRes = await usersCollection.add({
-				openid: openid,
+				deviceId: deviceId,
 				nickName: userInfo.nickName,
 				avatarUrl: userInfo.avatarUrl,
-				create_date: Date.now(),
-				last_login_date: Date.now()
+				createTime: Date.now(),
+				lastLoginTime: Date.now()
 			})
 			userId = addRes.id
+			userData = {
+				nickName: userInfo.nickName,
+				avatarUrl: userInfo.avatarUrl
+			}
 		} else {
-			// 老用户，更新最后登录时间
+			// 老用户，更新最后登录时间和用户信息
 			userId = userRes.data[0]._id
 			await usersCollection.doc(userId).update({
-				last_login_date: Date.now(),
+				lastLoginTime: Date.now(),
 				nickName: userInfo.nickName,
 				avatarUrl: userInfo.avatarUrl
 			})
+			userData = {
+				nickName: userInfo.nickName,
+				avatarUrl: userInfo.avatarUrl
+			}
 		}
 
 		return {
@@ -51,10 +57,7 @@ exports.main = async (event, context) => {
 			msg: '登录成功',
 			data: {
 				userId: userId,
-				userInfo: {
-					nickName: userInfo.nickName,
-					avatarUrl: userInfo.avatarUrl
-				}
+				userInfo: userData
 			}
 		}
 	} catch (error) {

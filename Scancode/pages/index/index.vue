@@ -242,6 +242,15 @@ export default {
 			}
 		},
 
+		// 生成UUID
+		generateUUID() {
+			return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+				const r = Math.random() * 16 | 0
+				const v = c === 'x' ? r : (r & 0x3 | 0x8)
+				return v.toString(16)
+			})
+		},
+
 		// 微信登录
 		async handleLogin() {
 			try {
@@ -255,28 +264,18 @@ export default {
 					})
 				})
 
-				// 2. 调用微信登录获取 code
-				const loginResult = await new Promise((resolve, reject) => {
-					uni.login({
-						provider: 'weixin',
-						success: (res) => resolve(res),
-						fail: (err) => reject(err)
-					})
-				})
-
-				if (!loginResult.code) {
-					uni.showToast({
-						title: '登录失败，请重试',
-						icon: 'none'
-					})
-					return
+				// 2. 检查是否已有设备ID，如果没有则生成
+				let deviceId = uni.getStorageSync('deviceId')
+				if (!deviceId) {
+					deviceId = this.generateUUID()
+					uni.setStorageSync('deviceId', deviceId)
 				}
 
-				// 3. 调用云函数进行登录
+				// 3. 调用云函数进行登录（使用deviceId + userInfo）
 				const result = await uniCloud.callFunction({
 					name: 'user-login',
 					data: {
-						code: loginResult.code,
+						deviceId: deviceId,
 						userInfo: userProfile.userInfo
 					}
 				})
