@@ -3,89 +3,67 @@
 		{
 			"path": "pages/index/index",
 			"style": {
-				"navigationBarTitleText": "动态",
-				"navigationStyle": "default",
+				"navigationBarTitleText": "我的相册",
+				"navigationStyle": "custom",
 				"enablePullDownRefresh": true
+			}
+		},
+		{
+			"path": "pages/upload/index",
+			"style": {
+				"navigationBarTitleText": "上传照片",
+				"navigationBarTextStyle": "black",
+				"navigationBarBackgroundColor": "#FFB6C1"
+			}
+		},
+		{
+			"path": "pages/album/index",
+			"style": {
+				"navigationBarTitleText": "宠物相册",
+				"navigationBarTextStyle": "black",
+				"navigationBarBackgroundColor": "#FFB6C1"
+			}
+		},
+		{
+			"path": "pages/profile/index",
+			"style": {
+				"navigationBarTitleText": "个人中心",
+				"navigationBarTextStyle": "black",
+				"navigationBarBackgroundColor": "#FFB6C1"
 			}
 		},
 		{
 			"path": "pages/about/index",
 			"style": {
-				"navigationBarTitleText": "发现",
-				"navigationStyle": "default",
-				"enablePullDownRefresh": true
-			}
-		},
-		{
-			"path": "pages/device-form/index",
-			"style": {
-				"navigationBarTitleText": "发布动态",
-				"navigationStyle": "default"
-			}
-		},
-		{
-			"path": "pages/business/index",
-			"style": {
-				"navigationBarTitleText": "宠物档案",
-				"navigationStyle": "default"
-			}
-		},
-		{
-			"path": "pages/contact/index",
-			"style": {
-				"navigationBarTitleText": "我的",
-				"navigationStyle": "default"
-			}
-		},
-		{
-			"path": "pages/admin/index",
-			"style": {
-				"navigationBarTitleText": "宠物管理",
-				"navigationStyle": "default"
+				"navigationBarTitleText": "关于我们",
+				"navigationBarTextStyle": "black",
+				"navigationBarBackgroundColor": "#FFB6C1"
 			}
 		}
 	],
 	"globalStyle": {
 		"navigationBarTextStyle": "black",
-		"navigationBarTitleText": "宠物社区",
-		"navigationBarBackgroundColor": "#FFFFFF",
-		"backgroundColor": "#F8F8F8",
+		"navigationBarTitleText": "喵汪兔星河",
+		"navigationBarBackgroundColor": "#FFB6C1",
+		"backgroundColor": "#FFF5F7",
 		"backgroundTextStyle": "dark"
 	},
 	"tabBar": {
-		"color": "#7A7E83",
-		"selectedColor": "#FF6B6B",
-		"borderStyle": "black",
+		"color": "#999999",
+		"selectedColor": "#FF69B4",
+		"borderStyle": "white",
 		"backgroundColor": "#FFFFFF",
 		"list": [
 			{
 				"pagePath": "pages/index/index",
-				"iconPath": "static/tabbar/home.png",
-				"selectedIconPath": "static/tabbar/home-active.png",
-				"text": "首页"
+				"text": "我的相册"
 			},
 			{
-				"pagePath": "pages/about/index",
-				"iconPath": "static/tabbar/discover.png",
-				"selectedIconPath": "static/tabbar/discover-active.png",
-				"text": "发现"
+				"pagePath": "pages/upload/index",
+				"text": "上传照片"
 			},
 			{
-				"pagePath": "pages/device-form/index",
-				"iconPath": "static/tabbar/publish.png",
-				"selectedIconPath": "static/tabbar/publish-active.png",
-				"text": "发布"
-			},
-			{
-				"pagePath": "pages/business/index",
-				"iconPath": "static/tabbar/pets.png",
-				"selectedIconPath": "static/tabbar/pets-active.png",
-				"text": "宠物"
-			},
-			{
-				"pagePath": "pages/contact/index",
-				"iconPath": "static/tabbar/profile.png",
-				"selectedIconPath": "static/tabbar/profile-active.png",
+				"pagePath": "pages/profile/index",
 				"text": "我的"
 			}
 		]

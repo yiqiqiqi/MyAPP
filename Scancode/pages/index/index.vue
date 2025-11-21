@@ -1,85 +1,86 @@
 <template>
-	<view class="pet-community">
-		<!-- 宠物动态列表 -->
+	<view class="album-home">
+		<!-- 自定义导航栏 -->
+		<view class="custom-navbar">
+			<view class="navbar-content">
+				<text class="navbar-title">🐾 我的相册</text>
+				<view class="navbar-actions">
+					<view class="share-btn" @tap="shareAlbum">
+						<text class="icon">📤</text>
+					</view>
+				</view>
+			</view>
+		</view>
+
+		<!-- 主内容区 -->
 		<scroll-view
-			class="post-list"
+			class="content"
 			scroll-y
-			@scrolltolower="loadMore"
 			:refresher-enabled="true"
 			:refresher-triggered="refreshing"
 			@refresherrefresh="onRefresh"
 		>
-			<!-- 动态列表 -->
-			<view class="post-item" v-for="post in postList" :key="post.id">
-				<!-- 用户信息 -->
-				<view class="post-header">
-					<image class="avatar" :src="post.avatar" mode="aspectFill"></image>
-					<view class="user-info">
-						<text class="username">{{ post.username }}</text>
-						<text class="post-time">{{ formatTime(post.createTime) }}</text>
-					</view>
+			<!-- 用户信息卡片 -->
+			<view class="user-card" v-if="userInfo">
+				<view class="user-avatar-wrapper">
+					<image class="user-avatar" :src="userInfo.avatarUrl" mode="aspectFill"></image>
+					<view class="avatar-deco">✨</view>
 				</view>
-
-				<!-- 动态内容 -->
-				<view class="post-content">
-					<text class="content-text">{{ post.content }}</text>
-
-					<!-- 宠物标签 -->
-					<view class="pet-tags" v-if="post.petName">
-						<text class="pet-tag">#{{ post.petName }}</text>
-						<text class="pet-tag" v-if="post.petType">#{{ post.petType }}</text>
-					</view>
-
-					<!-- 图片展示 -->
-					<view class="image-grid" v-if="post.images && post.images.length > 0">
-						<image
-							v-for="(img, index) in post.images"
-							:key="index"
-							:src="img"
-							mode="aspectFill"
-							class="post-image"
-							:class="'grid-' + (post.images.length > 3 ? 3 : post.images.length)"
-							@tap="previewImage(post.images, index)"
-						></image>
-					</view>
-				</view>
-
-				<!-- 互动区域 -->
-				<view class="post-actions">
-					<view class="action-item" @tap="toggleLike(post)">
-						<text class="icon" :class="post.isLiked ? 'liked' : ''">{{ post.isLiked ? '❤️' : '🤍' }}</text>
-						<text class="action-text">{{ post.likeCount || '点赞' }}</text>
-					</view>
-					<view class="action-item" @tap="showComments(post)">
-						<text class="icon">💬</text>
-						<text class="action-text">{{ post.commentCount || '评论' }}</text>
-					</view>
-					<view class="action-item">
-						<text class="icon">🔗</text>
-						<text class="action-text">分享</text>
-					</view>
-				</view>
-
-				<!-- 评论预览 -->
-				<view class="comments-preview" v-if="post.comments && post.comments.length > 0">
-					<view class="comment-item" v-for="comment in post.comments.slice(0, 2)" :key="comment.id">
-						<text class="comment-user">{{ comment.username }}：</text>
-						<text class="comment-text">{{ comment.content }}</text>
-					</view>
-					<text class="view-more" v-if="post.commentCount > 2" @tap="showComments(post)">
-						查看全部 {{ post.commentCount }} 条评论
-					</text>
+				<view class="user-info">
+					<text class="user-name">{{ userInfo.nickName }}</text>
+					<text class="album-count">📷 {{ photoCount }} 张照片</text>
 				</view>
 			</view>
 
-			<!-- 加载提示 -->
-			<view class="loading-more" v-if="loading">
-				<text>加载中...</text>
+			<!-- 登录提示 -->
+			<view class="login-card" v-else>
+				<text class="login-icon">🐱</text>
+				<text class="login-title">登录查看您的宠物相册</text>
+				<button class="login-btn" @tap="handleLogin" open-type="getUserInfo" @getuserinfo="onGetUserInfo">
+					<text>微信登录</text>
+				</button>
 			</view>
-			<view class="no-more" v-if="noMore">
-				<text>没有更多了</text>
+
+			<!-- 照片网格 -->
+			<view class="photos-section" v-if="userInfo && photos.length > 0">
+				<view class="section-header">
+					<text class="section-title">🌈 我的宠物</text>
+				</view>
+				<view class="photo-grid">
+					<view
+						class="photo-item"
+						v-for="(photo, index) in photos"
+						:key="photo._id"
+						@tap="previewPhoto(index)"
+					>
+						<image class="photo-img" :src="photo.url" mode="aspectFill"></image>
+						<view class="photo-mask">
+							<text class="photo-date">{{ formatDate(photo.createTime) }}</text>
+						</view>
+					</view>
+				</view>
+			</view>
+
+			<!-- 空状态 -->
+			<view class="empty-state" v-if="userInfo && photos.length === 0">
+				<text class="empty-icon">📸</text>
+				<text class="empty-text">还没有照片哦</text>
+				<text class="empty-hint">快去上传你的萌宠照片吧~</text>
+				<button class="upload-btn" @tap="goToUpload">
+					<text>上传照片</text>
+				</button>
+			</view>
+
+			<!-- 底部装饰 -->
+			<view class="bottom-deco">
+				<text class="deco-text">🐾 记录每一个美好瞬间 🐾</text>
 			</view>
 		</scroll-view>
+
+		<!-- 浮动上传按钮 -->
+		<view class="float-upload-btn" @tap="goToUpload" v-if="userInfo">
+			<text class="float-btn-icon">➕</text>
+		</view>
 	</view>
 </template>
 
@@ -87,210 +88,265 @@
 export default {
 	data() {
 		return {
-			postList: [],
-			loading: false,
-			refreshing: false,
-			noMore: false,
-			page: 1,
-			pageSize: 10
+			userInfo: null,
+			photos: [],
+			photoCount: 0,
+			refreshing: false
 		}
 	},
 	onLoad() {
-		this.loadPosts()
+		this.checkLogin()
+	},
+	onShow() {
+		if (this.userInfo) {
+			this.loadPhotos()
+		}
 	},
 	onPullDownRefresh() {
 		this.onRefresh()
 	},
 	methods: {
-		// 加载宠物动态列表
-		async loadPosts() {
-			if (this.loading || this.noMore) return
-
-			this.loading = true
+		// 检查登录状态
+		async checkLogin() {
 			try {
-				// 模拟数据 - 实际应调用云函数获取数据
-				const mockData = this.getMockData()
-
-				// 实际代码示例：
-				// const res = await uniCloud.callFunction({
-				// 	name: 'get_posts',
-				// 	data: {
-				// 		page: this.page,
-				// 		pageSize: this.pageSize
-				// 	}
-				// })
-				// this.postList = [...this.postList, ...res.result.data]
-
-				this.postList = [...this.postList, ...mockData]
-
-				if (mockData.length < this.pageSize) {
-					this.noMore = true
+				const userInfo = uni.getStorageSync('userInfo')
+				if (userInfo) {
+					this.userInfo = userInfo
+					await this.loadPhotos()
 				}
-				this.page++
-			} catch (error) {
+			} catch (e) {
+				console.error('检查登录失败', e)
+			}
+		},
+
+		// 微信登录
+		async handleLogin() {
+			try {
+				// 先获取用户信息授权
+				const [error, res] = await uni.getUserProfile({
+					desc: '用于展示个人信息',
+					lang: 'zh_CN'
+				})
+
+				if (error) {
+					uni.showToast({ title: '登录取消', icon: 'none' })
+					return
+				}
+
+				// 获取微信登录凭证
+				const loginRes = await uni.login()
+
+				// 调用云函数进行登录
+				const result = await uniCloud.callFunction({
+					name: 'user-login',
+					data: {
+						code: loginRes[1].code,
+						userInfo: res.userInfo
+					}
+				})
+
+				if (result.result.code === 0) {
+					this.userInfo = result.result.data.userInfo
+					uni.setStorageSync('userInfo', this.userInfo)
+					uni.setStorageSync('userId', result.result.data.userId)
+
+					uni.showToast({
+						title: '登录成功',
+						icon: 'success'
+					})
+
+					await this.loadPhotos()
+				}
+			} catch (e) {
+				console.error('登录失败', e)
 				uni.showToast({
-					title: '加载失败',
+					title: '登录失败，请重试',
 					icon: 'none'
 				})
-			} finally {
-				this.loading = false
+			}
+		},
+
+		// 加载照片
+		async loadPhotos() {
+			try {
+				const userId = uni.getStorageSync('userId')
+				if (!userId) return
+
+				const res = await uniCloud.callFunction({
+					name: 'get-photos',
+					data: { userId }
+				})
+
+				if (res.result.code === 0) {
+					this.photos = res.result.data.photos
+					this.photoCount = this.photos.length
+				}
+			} catch (e) {
+				console.error('加载照片失败', e)
 			}
 		},
 
 		// 下拉刷新
 		async onRefresh() {
 			this.refreshing = true
-			this.page = 1
-			this.noMore = false
-			this.postList = []
-			await this.loadPosts()
+			await this.loadPhotos()
 			this.refreshing = false
 			uni.stopPullDownRefresh()
 		},
 
-		// 加载更多
-		loadMore() {
-			this.loadPosts()
-		},
-
-		// 点赞/取消点赞
-		async toggleLike(post) {
-			post.isLiked = !post.isLiked
-			post.likeCount = post.isLiked ? (post.likeCount || 0) + 1 : (post.likeCount || 1) - 1
-
-			// 实际应调用云函数
-			// await uniCloud.callFunction({
-			// 	name: 'toggle_like',
-			// 	data: { postId: post.id }
-			// })
-		},
-
-		// 查看评论
-		showComments(post) {
-			// 跳转到评论详情页
-			uni.navigateTo({
-				url: `/pages/post-detail/index?id=${post.id}`
-			})
-		},
-
-		// 预览图片
-		previewImage(images, current) {
+		// 预览照片
+		previewPhoto(index) {
+			const urls = this.photos.map(p => p.url)
 			uni.previewImage({
-				urls: images,
-				current: current
+				urls,
+				current: index
 			})
 		},
 
-		// 格式化时间
-		formatTime(timestamp) {
-			if (!timestamp) return ''
-
-			const now = Date.now()
-			const diff = now - timestamp
-
-			const minute = 60 * 1000
-			const hour = 60 * minute
-			const day = 24 * hour
-
-			if (diff < minute) {
-				return '刚刚'
-			} else if (diff < hour) {
-				return Math.floor(diff / minute) + '分钟前'
-			} else if (diff < day) {
-				return Math.floor(diff / hour) + '小时前'
-			} else if (diff < 7 * day) {
-				return Math.floor(diff / day) + '天前'
-			} else {
-				const date = new Date(timestamp)
-				return `${date.getMonth() + 1}-${date.getDate()}`
-			}
+		// 跳转上传
+		goToUpload() {
+			uni.switchTab({
+				url: '/pages/upload/index'
+			})
 		},
 
-		// 模拟数据
-		getMockData() {
-			const mockPosts = [
-				{
-					id: '1',
-					username: '爱宠人士小王',
-					avatar: '/static/avatar/avatar1.png',
-					content: '今天带我家狗狗去公园玩啦！看它开心的样子我也好开心😊',
-					petName: '大黄',
-					petType: '金毛',
-					images: ['/static/demo/pet1.jpg', '/static/demo/pet2.jpg'],
-					likeCount: 128,
-					commentCount: 15,
-					isLiked: false,
-					createTime: Date.now() - 2 * 60 * 60 * 1000,
-					comments: [
-						{ id: 'c1', username: '宠物达人', content: '好可爱的狗狗！' },
-						{ id: 'c2', username: '喵星人', content: '羡慕你们的快乐时光' }
-					]
-				},
-				{
-					id: '2',
-					username: '猫咪铲屎官',
-					avatar: '/static/avatar/avatar2.png',
-					content: '我家猫主子今天终于肯让我摸了！感动😭',
-					petName: '咪咪',
-					petType: '英短',
-					images: ['/static/demo/cat1.jpg'],
-					likeCount: 256,
-					commentCount: 32,
-					isLiked: true,
-					createTime: Date.now() - 5 * 60 * 60 * 1000,
-					comments: [
-						{ id: 'c3', username: '养猫大户', content: '太幸福了吧！' }
-					]
-				},
-				{
-					id: '3',
-					username: '宠物医生李医生',
-					avatar: '/static/avatar/avatar3.png',
-					content: '【养宠小贴士】夏季到了，记得给宠物做好防暑降温工作哦！',
-					petName: '',
-					petType: '',
-					images: [],
-					likeCount: 89,
-					commentCount: 8,
-					isLiked: false,
-					createTime: Date.now() - 1 * 24 * 60 * 60 * 1000,
-					comments: []
-				}
-			]
-			return this.page === 1 ? mockPosts : []
+		// 分享相册
+		shareAlbum() {
+			const userId = uni.getStorageSync('userId')
+			uni.showShareMenu({
+				withShareTicket: true,
+				menus: ['shareAppMessage', 'shareTimeline']
+			})
+
+			uni.showToast({
+				title: '点击右上角分享',
+				icon: 'none'
+			})
+		},
+
+		// 格式化日期
+		formatDate(timestamp) {
+			const date = new Date(timestamp)
+			const month = date.getMonth() + 1
+			const day = date.getDate()
+			return `${month}月${day}日`
+		},
+
+		// 获取用户信息回调
+		onGetUserInfo(e) {
+			if (e.detail.userInfo) {
+				this.handleLogin()
+			}
+		}
+	},
+
+	// 分享配置
+	onShareAppMessage() {
+		const userId = uni.getStorageSync('userId')
+		const nickname = this.userInfo?.nickName || '我'
+		return {
+			title: `🐾 ${nickname}的萌宠相册`,
+			path: `/pages/album/index?userId=${userId}`,
+			imageUrl: this.photos[0]?.url || ''
+		}
+	},
+
+	onShareTimeline() {
+		const userId = uni.getStorageSync('userId')
+		const nickname = this.userInfo?.nickName || '我'
+		return {
+			title: `🐾 ${nickname}的萌宠相册`,
+			query: `userId=${userId}`,
+			imageUrl: this.photos[0]?.url || ''
 		}
 	}
 }
 </script>
 
 <style lang="scss">
-.pet-community {
+.album-home {
 	width: 100%;
+	min-height: 100vh;
+	background: linear-gradient(180deg, #FFF5F7 0%, #FFE8EE 100%);
+}
+
+/* 自定义导航栏 */
+.custom-navbar {
+	position: fixed;
+	top: 0;
+	left: 0;
+	right: 0;
+	z-index: 1000;
+	background: linear-gradient(135deg, #FFB6C1 0%, #FF69B4 100%);
+	padding-top: calc(var(--status-bar-height) + 10rpx);
+	padding-bottom: 20rpx;
+	box-shadow: 0 4rpx 20rpx rgba(255, 105, 180, 0.3);
+
+	.navbar-content {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		padding: 0 30rpx;
+
+		.navbar-title {
+			font-size: 36rpx;
+			font-weight: 700;
+			color: #FFFFFF;
+			text-shadow: 2rpx 2rpx 4rpx rgba(0, 0, 0, 0.1);
+		}
+
+		.navbar-actions {
+			.share-btn {
+				width: 70rpx;
+				height: 70rpx;
+				background: rgba(255, 255, 255, 0.3);
+				border-radius: 50%;
+				display: flex;
+				align-items: center;
+				justify-content: center;
+
+				.icon {
+					font-size: 36rpx;
+				}
+			}
+		}
+	}
+}
+
+/* 内容区域 */
+.content {
+	padding-top: calc(var(--status-bar-height) + 110rpx);
 	height: 100vh;
-	background-color: #F8F8F8;
+	box-sizing: border-box;
 }
 
-.post-list {
-	height: 100%;
-}
-
-.post-item {
-	background-color: #FFFFFF;
-	margin-bottom: 20rpx;
-	padding: 30rpx;
-}
-
-.post-header {
+/* 用户卡片 */
+.user-card {
+	margin: 30rpx;
+	padding: 40rpx;
+	background: linear-gradient(135deg, #FFFFFF 0%, #FFF5F7 100%);
+	border-radius: 30rpx;
+	box-shadow: 0 8rpx 30rpx rgba(255, 105, 180, 0.15);
 	display: flex;
 	align-items: center;
-	margin-bottom: 20rpx;
 
-	.avatar {
-		width: 80rpx;
-		height: 80rpx;
-		border-radius: 50%;
-		margin-right: 20rpx;
-		background-color: #E0E0E0;
+	.user-avatar-wrapper {
+		position: relative;
+		margin-right: 30rpx;
+
+		.user-avatar {
+			width: 120rpx;
+			height: 120rpx;
+			border-radius: 50%;
+			border: 6rpx solid #FFB6C1;
+		}
+
+		.avatar-deco {
+			position: absolute;
+			bottom: -10rpx;
+			right: -10rpx;
+			font-size: 40rpx;
+		}
 	}
 
 	.user-info {
@@ -298,138 +354,177 @@ export default {
 		display: flex;
 		flex-direction: column;
 
-		.username {
-			font-size: 32rpx;
+		.user-name {
+			font-size: 36rpx;
 			font-weight: 600;
-			color: #333;
-			margin-bottom: 8rpx;
+			color: #FF69B4;
+			margin-bottom: 10rpx;
 		}
 
-		.post-time {
-			font-size: 24rpx;
+		.album-count {
+			font-size: 28rpx;
 			color: #999;
 		}
 	}
 }
 
-.post-content {
-	.content-text {
-		font-size: 30rpx;
-		color: #333;
-		line-height: 1.6;
-		display: block;
-		margin-bottom: 20rpx;
+/* 登录卡片 */
+.login-card {
+	margin: 30rpx;
+	padding: 80rpx 40rpx;
+	background: linear-gradient(135deg, #FFFFFF 0%, #FFF5F7 100%);
+	border-radius: 30rpx;
+	box-shadow: 0 8rpx 30rpx rgba(255, 105, 180, 0.15);
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+
+	.login-icon {
+		font-size: 120rpx;
+		margin-bottom: 30rpx;
 	}
 
-	.pet-tags {
-		display: flex;
-		flex-wrap: wrap;
-		gap: 10rpx;
-		margin-bottom: 20rpx;
+	.login-title {
+		font-size: 32rpx;
+		color: #666;
+		margin-bottom: 40rpx;
+	}
 
-		.pet-tag {
-			font-size: 26rpx;
-			color: #FF6B6B;
-			background-color: #FFE8E8;
-			padding: 8rpx 16rpx;
-			border-radius: 20rpx;
+	.login-btn {
+		width: 400rpx;
+		height: 90rpx;
+		background: linear-gradient(135deg, #FFB6C1 0%, #FF69B4 100%);
+		color: #FFFFFF;
+		border: none;
+		border-radius: 45rpx;
+		font-size: 32rpx;
+		font-weight: 600;
+		box-shadow: 0 8rpx 20rpx rgba(255, 105, 180, 0.4);
+	}
+}
+
+/* 照片区域 */
+.photos-section {
+	margin: 30rpx;
+
+	.section-header {
+		margin-bottom: 30rpx;
+
+		.section-title {
+			font-size: 36rpx;
+			font-weight: 600;
+			color: #FF69B4;
 		}
 	}
 
-	.image-grid {
-		display: flex;
-		flex-wrap: wrap;
-		gap: 10rpx;
+	.photo-grid {
+		display: grid;
+		grid-template-columns: repeat(3, 1fr);
+		gap: 20rpx;
 
-		.post-image {
-			border-radius: 12rpx;
-			background-color: #F0F0F0;
+		.photo-item {
+			position: relative;
+			width: 100%;
+			padding-bottom: 100%;
+			border-radius: 20rpx;
+			overflow: hidden;
+			box-shadow: 0 4rpx 15rpx rgba(255, 105, 180, 0.2);
 
-			&.grid-1 {
+			.photo-img {
+				position: absolute;
+				top: 0;
+				left: 0;
 				width: 100%;
-				height: 500rpx;
+				height: 100%;
 			}
 
-			&.grid-2 {
-				width: calc(50% - 5rpx);
-				height: 300rpx;
-			}
+			.photo-mask {
+				position: absolute;
+				bottom: 0;
+				left: 0;
+				right: 0;
+				padding: 10rpx;
+				background: linear-gradient(to top, rgba(0, 0, 0, 0.5), transparent);
 
-			&.grid-3 {
-				width: calc(33.333% - 7rpx);
-				height: 200rpx;
+				.photo-date {
+					font-size: 20rpx;
+					color: #FFFFFF;
+				}
 			}
 		}
 	}
 }
 
-.post-actions {
+/* 空状态 */
+.empty-state {
+	margin: 100rpx 30rpx;
+	padding: 80rpx 40rpx;
+	background: linear-gradient(135deg, #FFFFFF 0%, #FFF5F7 100%);
+	border-radius: 30rpx;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+
+	.empty-icon {
+		font-size: 120rpx;
+		margin-bottom: 30rpx;
+	}
+
+	.empty-text {
+		font-size: 32rpx;
+		color: #666;
+		margin-bottom: 10rpx;
+	}
+
+	.empty-hint {
+		font-size: 28rpx;
+		color: #999;
+		margin-bottom: 40rpx;
+	}
+
+	.upload-btn {
+		width: 400rpx;
+		height: 90rpx;
+		background: linear-gradient(135deg, #FFB6C1 0%, #FF69B4 100%);
+		color: #FFFFFF;
+		border: none;
+		border-radius: 45rpx;
+		font-size: 32rpx;
+		font-weight: 600;
+		box-shadow: 0 8rpx 20rpx rgba(255, 105, 180, 0.4);
+	}
+}
+
+/* 底部装饰 */
+.bottom-deco {
+	padding: 60rpx 30rpx;
+	text-align: center;
+
+	.deco-text {
+		font-size: 28rpx;
+		color: #FFB6C1;
+	}
+}
+
+/* 浮动按钮 */
+.float-upload-btn {
+	position: fixed;
+	right: 40rpx;
+	bottom: 120rpx;
+	width: 120rpx;
+	height: 120rpx;
+	background: linear-gradient(135deg, #FFB6C1 0%, #FF69B4 100%);
+	border-radius: 50%;
+	box-shadow: 0 8rpx 25rpx rgba(255, 105, 180, 0.5);
 	display: flex;
 	align-items: center;
-	padding: 20rpx 0;
-	border-top: 1rpx solid #F0F0F0;
-	margin-top: 20rpx;
+	justify-content: center;
+	z-index: 999;
 
-	.action-item {
-		flex: 1;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		gap: 10rpx;
-
-		.icon {
-			font-size: 40rpx;
-
-			&.liked {
-				animation: like-bounce 0.3s ease;
-			}
-		}
-
-		.action-text {
-			font-size: 28rpx;
-			color: #666;
-		}
+	.float-btn-icon {
+		font-size: 60rpx;
+		color: #FFFFFF;
+		font-weight: 600;
 	}
-}
-
-@keyframes like-bounce {
-	0%, 100% { transform: scale(1); }
-	50% { transform: scale(1.3); }
-}
-
-.comments-preview {
-	background-color: #F8F8F8;
-	padding: 20rpx;
-	border-radius: 12rpx;
-	margin-top: 20rpx;
-
-	.comment-item {
-		font-size: 28rpx;
-		line-height: 1.6;
-		margin-bottom: 10rpx;
-
-		.comment-user {
-			color: #4A90E2;
-			font-weight: 500;
-		}
-
-		.comment-text {
-			color: #666;
-		}
-	}
-
-	.view-more {
-		font-size: 26rpx;
-		color: #999;
-		display: block;
-		margin-top: 10rpx;
-	}
-}
-
-.loading-more, .no-more {
-	text-align: center;
-	padding: 40rpx;
-	font-size: 28rpx;
-	color: #999;
 }
 </style>
