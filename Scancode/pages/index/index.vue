@@ -242,18 +242,11 @@ export default {
 			}
 		},
 
-		// 生成UUID
-		generateUUID() {
-			return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
-				const r = Math.random() * 16 | 0
-				const v = c === 'x' ? r : (r & 0x3 | 0x8)
-				return v.toString(16)
-			})
-		},
-
 		// 微信登录
 		async handleLogin() {
 			try {
+				uni.showLoading({ title: '登录中...', mask: true })
+
 				// 1. 获取用户信息授权
 				const userProfile = await new Promise((resolve, reject) => {
 					uni.getUserProfile({
@@ -264,26 +257,44 @@ export default {
 					})
 				})
 
-				// 2. 检查是否已有设备ID，如果没有则生成
-				let deviceId = uni.getStorageSync('deviceId')
-				if (!deviceId) {
-					deviceId = this.generateUUID()
-					uni.setStorageSync('deviceId', deviceId)
+				// 2. 调用微信登录获取 code
+				const loginResult = await new Promise((resolve, reject) => {
+					uni.login({
+						provider: 'weixin',
+						success: (res) => resolve(res),
+						fail: (err) => reject(err)
+					})
+				})
+
+				if (!loginResult.code) {
+					uni.hideLoading()
+					uni.showToast({
+						title: '获取登录凭证失败',
+						icon: 'none'
+					})
+					return
 				}
 
-				// 3. 调用云函数进行登录（使用deviceId + userInfo）
+				// 3. 调用云函数进行登录
 				const result = await uniCloud.callFunction({
 					name: 'user-login',
 					data: {
-						deviceId: deviceId,
+						code: loginResult.code,
 						userInfo: userProfile.userInfo
 					}
 				})
+
+				uni.hideLoading()
 
 				if (result.result.code === 0) {
 					this.userInfo = result.result.data.userInfo
 					uni.setStorageSync('userInfo', this.userInfo)
 					uni.setStorageSync('userId', result.result.data.userId)
+
+					// 保存 openid（可用于后续功能）
+					if (result.result.data.openid) {
+						uni.setStorageSync('openid', result.result.data.openid)
+					}
 
 					uni.showToast({
 						title: '登录成功 ✨',
@@ -296,10 +307,12 @@ export default {
 				} else {
 					uni.showToast({
 						title: result.result.msg || '登录失败',
-						icon: 'none'
+						icon: 'none',
+						duration: 3000
 					})
 				}
 			} catch (e) {
+				uni.hideLoading()
 				console.error('登录失败', e)
 				if (e.errMsg && e.errMsg.includes('cancel')) {
 					uni.showToast({
