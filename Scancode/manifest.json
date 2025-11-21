@@ -1,7 +1,7 @@
 {
-    "name" : "Scancode",
+    "name" : "宠物社区",
     "appid" : "__UNI__D740E63",
-    "description" : "",
+    "description" : "一个温馨的宠物社交平台，分享你和宠物的美好时光",
     "versionName" : "1.0.0",
     "versionCode" : "100",
     "transformPx" : false,

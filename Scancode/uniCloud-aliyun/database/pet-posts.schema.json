@@ -1,0 +1,78 @@
+{
+  "collection": "pet-posts",
+  "fields": {
+    "userId": {
+      "type": "String",
+      "description": "用户ID"
+    },
+    "username": {
+      "type": "String",
+      "description": "用户昵称"
+    },
+    "avatar": {
+      "type": "String",
+      "description": "用户头像"
+    },
+    "content": {
+      "type": "String",
+      "description": "动态内容"
+    },
+    "images": {
+      "type": "Array",
+      "description": "图片列表"
+    },
+    "petId": {
+      "type": "String",
+      "description": "关联的宠物ID"
+    },
+    "petName": {
+      "type": "String",
+      "description": "宠物名称"
+    },
+    "petType": {
+      "type": "String",
+      "description": "宠物类型"
+    },
+    "topics": {
+      "type": "Array",
+      "description": "话题标签"
+    },
+    "location": {
+      "type": "Object",
+      "description": "位置信息"
+    },
+    "likeCount": {
+      "type": "Number",
+      "description": "点赞数",
+      "default": 0
+    },
+    "commentCount": {
+      "type": "Number",
+      "description": "评论数",
+      "default": 0
+    },
+    "shareCount": {
+      "type": "Number",
+      "description": "分享数",
+      "default": 0
+    },
+    "create_time": {
+      "type": "Date",
+      "description": "发布时间"
+    },
+    "update_time": {
+      "type": "Date",
+      "description": "更新时间"
+    }
+  },
+  "indexes": [
+    {
+      "name": "userId_index",
+      "fields": ["userId"]
+    },
+    {
+      "name": "petId_index",
+      "fields": ["petId"]
+    }
+  ]
+}
