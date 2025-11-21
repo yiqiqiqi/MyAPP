@@ -1,0 +1,63 @@
+{
+  "collection": "pets",
+  "fields": {
+    "userId": {
+      "type": "String",
+      "description": "主人用户ID"
+    },
+    "name": {
+      "type": "String",
+      "description": "宠物名称"
+    },
+    "type": {
+      "type": "String",
+      "description": "宠物类型（狗、猫、鸟等）"
+    },
+    "breed": {
+      "type": "String",
+      "description": "品种"
+    },
+    "gender": {
+      "type": "String",
+      "description": "性别"
+    },
+    "age": {
+      "type": "Number",
+      "description": "年龄"
+    },
+    "birthday": {
+      "type": "Date",
+      "description": "生日"
+    },
+    "avatar": {
+      "type": "String",
+      "description": "宠物头像"
+    },
+    "description": {
+      "type": "String",
+      "description": "描述"
+    },
+    "weight": {
+      "type": "Number",
+      "description": "体重（kg）"
+    },
+    "color": {
+      "type": "String",
+      "description": "毛色"
+    },
+    "create_time": {
+      "type": "Date",
+      "description": "创建时间"
+    },
+    "update_time": {
+      "type": "Date",
+      "description": "更新时间"
+    }
+  },
+  "indexes": [
+    {
+      "name": "userId_index",
+      "fields": ["userId"]
+    }
+  ]
+}

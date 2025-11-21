@@ -1,311 +1,439 @@
 <template>
-  <view class="device-form">
-    <form @submit="handleSubmit">
-      <!-- 设备基本信息 -->
-      <view class="form-header">
-        <text class="form-title">设备检测表单</text>
-        <view class="device-info">
-          <text>设备编号：{{ deviceId }}</text>
-        </view>
-      </view>
+	<view class="publish-page">
+		<scroll-view class="content" scroll-y>
+			<!-- 内容输入区 -->
+			<view class="input-section">
+				<textarea
+					class="content-input"
+					v-model="postContent"
+					placeholder="分享你和宠物的故事..."
+					:maxlength="500"
+					auto-height
+				></textarea>
+				<view class="char-count">{{ postContent.length }}/500</view>
+			</view>
 
-      <!-- 工序选择 -->
-      <view class="process-section">
-        <text class="label">选择工序</text>
-        <picker
-          mode="selector"
-          :range="processNames"
-          :value="currentProcessIndex"
-          @change="handleProcessChange"
-          class="process-picker"
-        >
-          <view class="picker-text">
-            {{ processNames[currentProcessIndex] || '请选择工序' }}
-          </view>
-        </picker>
-      </view>
+			<!-- 图片上传区 -->
+			<view class="image-section">
+				<text class="section-title">添加图片</text>
+				<view class="image-grid">
+					<!-- 已上传的图片 -->
+					<view class="image-item" v-for="(img, index) in images" :key="index">
+						<image :src="img" mode="aspectFill" class="uploaded-image"></image>
+						<view class="delete-btn" @tap="deleteImage(index)">
+							<text>×</text>
+						</view>
+					</view>
+					<!-- 上传按钮 -->
+					<view class="upload-btn" @tap="chooseImage" v-if="images.length < 9">
+						<text class="upload-icon">+</text>
+						<text class="upload-text">添加图片</text>
+					</view>
+				</view>
+			</view>
 
-      <!-- 当前工序表单 -->
-      <view class="form-section">
-        <!-- 检测人员 -->
-        <view class="form-item">
-          <text class="label">检测人员</text>
-          <input 
-            type="text"
-            v-model="currentProcess.inspector"
-            placeholder="请输入检测人员姓名"
-          />
-        </view>
+			<!-- 宠物信息 -->
+			<view class="pet-section">
+				<text class="section-title">关联宠物</text>
+				<view class="pet-selector" @tap="selectPet">
+					<text v-if="selectedPet">{{ selectedPet.name }} - {{ selectedPet.type }}</text>
+					<text v-else class="placeholder">选择你的宠物</text>
+					<text class="arrow">→</text>
+				</view>
+			</view>
 
-        <!-- 检测时间 -->
-        <view class="form-item">
-          <text class="label">检测时间</text>
-          <picker
-            mode="date"
-            :value="currentProcess.inspectTime"
-            @change="handleDateChange"
-          >
-            <view class="picker-text">
-              {{ currentProcess.inspectTime || '请选择检测时间' }}
-            </view>
-          </picker>
-        </view>
+			<!-- 话题标签 -->
+			<view class="topic-section">
+				<text class="section-title">添加话题</text>
+				<view class="topic-input-group">
+					<input
+						class="topic-input"
+						v-model="topicInput"
+						placeholder="输入话题标签（可选）"
+						:maxlength="20"
+					/>
+					<button class="add-topic-btn" @tap="addTopic">添加</button>
+				</view>
+				<view class="topic-list" v-if="topics.length > 0">
+					<view class="topic-tag" v-for="(topic, index) in topics" :key="index">
+						<text>#{{ topic }}</text>
+						<text class="remove-topic" @tap="removeTopic(index)">×</text>
+					</view>
+				</view>
+			</view>
 
-        <!-- 检测图片 -->
-        <view class="form-item">
-          <text class="label">检测图片</text>
-          <view class="image-upload">
-            <image 
-              v-if="currentProcess.image" 
-              :src="currentProcess.image" 
-              mode="aspectFit"
-              class="preview-image"
-            />
-            <button 
-              class="upload-btn"
-              @tap="handleUploadImage"
-            >
-              {{ currentProcess.image ? '重新上传' : '上传图片' }}
-            </button>
-          </view>
-        </view>
-      </view>
+			<!-- 定位（可选） -->
+			<view class="location-section">
+				<text class="section-title">添加位置</text>
+				<view class="location-selector" @tap="chooseLocation">
+					<text v-if="location">{{ location.name }}</text>
+					<text v-else class="placeholder">选择位置（可选）</text>
+					<text class="arrow">→</text>
+				</view>
+			</view>
+		</scroll-view>
 
-      <!-- 提交按钮 -->
-      <button 
-        form-type="submit"
-        type="primary"
-        class="submit-btn"
-      >
-        提交表单
-      </button>
-    </form>
-  </view>
+		<!-- 底部发布按钮 -->
+		<view class="publish-footer">
+			<button class="publish-btn" @tap="publishPost" :disabled="!canPublish">
+				{{ publishing ? '发布中...' : '发布' }}
+			</button>
+		</view>
+	</view>
 </template>
 
 <script>
 export default {
-  data() {
-    return {
-      deviceId: '', // 设备ID
-      processNames: [
-         '来料检',
-         '过程检',
-         '插接头焊接',
-         '固定头焊接',
-         '导管安装',
-         '接地线焊接',
-         '转轮安装',
-         '上壳组件安装',
-         '手柄手轮安装',
-         '内包',
-         '完工检',
-         '出厂检'
-      ],
-      currentProcessIndex: 0,  // 当前选中的工序索引
-      processList: Array(12).fill().map(() => ({
-        inspector: '', // 检测人员
-        inspectTime: '', // 检测时间
-        image: '' // 检测图片
-      }))
-    }
-  },
+	data() {
+		return {
+			postContent: '',
+			images: [],
+			selectedPet: null,
+			topics: [],
+			topicInput: '',
+			location: null,
+			publishing: false
+		}
+	},
+	computed: {
+		canPublish() {
+			return this.postContent.trim().length > 0 && !this.publishing
+		}
+	},
+	methods: {
+		// 选择图片
+		chooseImage() {
+			const remainCount = 9 - this.images.length
+			uni.chooseImage({
+				count: remainCount,
+				sizeType: ['compressed'],
+				sourceType: ['album', 'camera'],
+				success: (res) => {
+					this.uploadImages(res.tempFilePaths)
+				}
+			})
+		},
 
-  computed: {
-    currentProcess() {
-      return this.processList[this.currentProcessIndex];
-    }
-  },
+		// 上传图片到云存储
+		async uploadImages(tempFiles) {
+			uni.showLoading({ title: '上传中...' })
 
-  onLoad(options) {
-    if (options.deviceId) {
-      this.deviceId = options.deviceId
-    }
-  },
+			try {
+				for (const file of tempFiles) {
+					const cloudPath = `posts/${Date.now()}_${Math.random().toString(36).substr(2, 9)}.jpg`
+					const uploadRes = await uniCloud.uploadFile({
+						filePath: file,
+						cloudPath: cloudPath
+					})
 
-  methods: {
-    // 处理工序选择
-    handleProcessChange(e) {
-      this.currentProcessIndex = Number(e.detail.value);
-    },
+					if (uploadRes.fileID) {
+						const tempUrlRes = await uniCloud.getTempFileURL({
+							fileList: [uploadRes.fileID]
+						})
+						this.images.push(tempUrlRes.fileList[0].tempFileURL)
+					}
+				}
+				uni.hideLoading()
+			} catch (error) {
+				uni.hideLoading()
+				uni.showToast({ title: '上传失败', icon: 'none' })
+			}
+		},
 
-    // 处理日期选择
-    handleDateChange(e) {
-      this.currentProcess.inspectTime = e.detail.value;
-    },
+		// 删除图片
+		deleteImage(index) {
+			this.images.splice(index, 1)
+		},
 
-    // 处理图片上传
-    handleUploadImage() {
-      uni.chooseImage({
-        count: 1,
-        success: (res) => {
-          const tempFilePath = res.tempFilePaths[0];
-          // 捕获当前工序索引
-          const processIndex = this.currentProcessIndex;
-          // 提取文件扩展名，若没有则默认使用 .jpg
-          const dotIndex = tempFilePath.lastIndexOf('.');
-          const ext = dotIndex !== -1 ? tempFilePath.substring(dotIndex) : '.jpg';
-          uni.showLoading({ title: '上传中...' });
-          // 使用设备编号和对应工序命名，例如：upload/设备编号_工序名称_时间戳.ext
-          const cloudPath = `upload/${this.deviceId}_${this.processNames[processIndex]}_${Date.now()}${ext}`;
-          uniCloud.uploadFile({
-            filePath: tempFilePath,
-            cloudPath: cloudPath
-          }).then(uploadRes => {
-            if (uploadRes && uploadRes.fileID) {
-              uniCloud.getTempFileURL({
-                fileList: [uploadRes.fileID]
-              }).then(tempUrlRes => {
-                const tempUrl = tempUrlRes.fileList[0].tempFileURL;
-                // 更新当前工序图片
-                this.processList[processIndex].image = tempUrl;
-                uni.hideLoading();
-                uni.showToast({ title: '上传成功', icon: 'success' });
-              }).catch(err => {
-                uni.hideLoading();
-                uni.showToast({ title: '获取预览图失败', icon: 'none' });
-                console.error(err);
-              });
-            } else {
-              uni.hideLoading();
-              uni.showToast({ title: '图片上传失败', icon: 'none' });
-            }
-          }).catch(err => {
-            uni.hideLoading();
-            uni.showToast({ title: '图片上传失败', icon: 'none' });
-            console.error(err);
-          });
-        },
-        fail: () => {
-          uni.showToast({ title: '图片选择失败', icon: 'none' });
-        }
-      });
-    },
+		// 选择宠物
+		selectPet() {
+			// 实际应该跳转到宠物列表页面选择
+			uni.navigateTo({
+				url: '/pages/select-pet/index'
+			})
+			// 模拟选择
+			this.selectedPet = {
+				id: '1',
+				name: '大黄',
+				type: '金毛'
+			}
+		},
 
-    // 提交表单
-    handleSubmit() {
-      // 表单验证
-      if (!this.validateForm()) {
-        return
-      }
+		// 添加话题
+		addTopic() {
+			const topic = this.topicInput.trim()
+			if (topic && this.topics.length < 5 && !this.topics.includes(topic)) {
+				this.topics.push(topic)
+				this.topicInput = ''
+			}
+		},
 
-      // 提交数据到服务器
-      console.log('表单数据：', this.currentProcess)
-      uni.showToast({
-        title: '提交成功',
-        icon: 'success'
-      })
-    },
+		// 删除话题
+		removeTopic(index) {
+			this.topics.splice(index, 1)
+		},
 
-    // 表单验证
-    validateForm() {
-      const process = this.currentProcess;
-      if (!process.inspector || !process.inspectTime) {
-        uni.showToast({
-          title: '请完善当前工序信息',
-          icon: 'none'
-        });
-        return false;
-      }
-      return true;
-    }
-  }
+		// 选择位置
+		chooseLocation() {
+			uni.chooseLocation({
+				success: (res) => {
+					this.location = {
+						name: res.name,
+						address: res.address,
+						latitude: res.latitude,
+						longitude: res.longitude
+					}
+				}
+			})
+		},
+
+		// 发布动态
+		async publishPost() {
+			if (!this.canPublish) return
+
+			this.publishing = true
+			uni.showLoading({ title: '发布中...' })
+
+			try {
+				// 调用云函数发布动态
+				const res = await uniCloud.callFunction({
+					name: 'submit_post',
+					data: {
+						content: this.postContent,
+						images: this.images,
+						petId: this.selectedPet?.id,
+						petName: this.selectedPet?.name,
+						petType: this.selectedPet?.type,
+						topics: this.topics,
+						location: this.location
+					}
+				})
+
+				if (res.result.code === 0) {
+					uni.showToast({
+						title: '发布成功',
+						icon: 'success'
+					})
+
+					// 延迟跳转回首页
+					setTimeout(() => {
+						uni.switchTab({
+							url: '/pages/index/index'
+						})
+					}, 1500)
+				} else {
+					throw new Error(res.result.msg || '发布失败')
+				}
+			} catch (error) {
+				uni.showToast({
+					title: error.message || '发布失败',
+					icon: 'none'
+				})
+			} finally {
+				this.publishing = false
+				uni.hideLoading()
+			}
+		}
+	}
 }
 </script>
 
 <style lang="scss">
-.device-form {
-  padding: 20rpx;
-
-  .form-header {
-    margin-bottom: 30rpx;
-    
-    .form-title {
-      font-size: 36rpx;
-      font-weight: bold;
-    }
-
-    .device-info {
-      margin-top: 10rpx;
-      color: #666;
-    }
-  }
-
-  .process-section {
-    margin-bottom: 40rpx;
-    padding: 20rpx;
-    background-color: #f8f8f8;
-    border-radius: 8rpx;
-
-    .label {
-      display: block;
-      margin-bottom: 10rpx;
-      color: #333;
-    }
-  }
-
-  .process-picker {
-    width: 100%;
-    height: 70rpx;
-    line-height: 70rpx;
-    padding: 0 20rpx;
-    background-color: #fff;
-    border: 1rpx solid #ddd;
-    border-radius: 4rpx;
-  }
-
-  .form-section {
-    margin-bottom: 40rpx;
-    padding: 20rpx;
-    background-color: #f8f8f8;
-    border-radius: 8rpx;
-  }
-
-  .form-item {
-    margin-bottom: 20rpx;
-
-    .label {
-      display: block;
-      margin-bottom: 10rpx;
-      color: #333;
-    }
-
-    input {
-      width: 100%;
-      height: 70rpx;
-      padding: 0 20rpx;
-      background-color: #fff;
-      border: 1rpx solid #ddd;
-      border-radius: 4rpx;
-    }
-
-    .picker-text {
-      width: 100%;
-      height: 70rpx;
-      line-height: 70rpx;
-      padding: 0 20rpx;
-      background-color: #fff;
-      border: 1rpx solid #ddd;
-      border-radius: 4rpx;
-    }
-  }
-
-  .image-upload {
-    .preview-image {
-      width: 200rpx;
-      height: 200rpx;
-      margin-bottom: 20rpx;
-    }
-
-    .upload-btn {
-      width: 200rpx;
-      font-size: 28rpx;
-    }
-  }
-
-  .submit-btn {
-    margin-top: 40rpx;
-    width: 100%;
-  }
+.publish-page {
+	width: 100%;
+	height: 100vh;
+	background-color: #F8F8F8;
+	display: flex;
+	flex-direction: column;
 }
-</style> 
+
+.content {
+	flex: 1;
+	padding: 30rpx;
+}
+
+.input-section {
+	background-color: #FFFFFF;
+	border-radius: 12rpx;
+	padding: 30rpx;
+	margin-bottom: 20rpx;
+
+	.content-input {
+		width: 100%;
+		min-height: 300rpx;
+		font-size: 32rpx;
+		line-height: 1.6;
+		color: #333;
+	}
+
+	.char-count {
+		text-align: right;
+		font-size: 24rpx;
+		color: #999;
+		margin-top: 20rpx;
+	}
+}
+
+.image-section,
+.pet-section,
+.topic-section,
+.location-section {
+	background-color: #FFFFFF;
+	border-radius: 12rpx;
+	padding: 30rpx;
+	margin-bottom: 20rpx;
+
+	.section-title {
+		display: block;
+		font-size: 30rpx;
+		font-weight: 600;
+		color: #333;
+		margin-bottom: 20rpx;
+	}
+}
+
+.image-grid {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 20rpx;
+
+	.image-item {
+		position: relative;
+		width: 200rpx;
+		height: 200rpx;
+
+		.uploaded-image {
+			width: 100%;
+			height: 100%;
+			border-radius: 12rpx;
+		}
+
+		.delete-btn {
+			position: absolute;
+			top: -10rpx;
+			right: -10rpx;
+			width: 50rpx;
+			height: 50rpx;
+			background-color: rgba(0, 0, 0, 0.6);
+			border-radius: 50%;
+			display: flex;
+			align-items: center;
+			justify-content: center;
+
+			text {
+				color: #FFFFFF;
+				font-size: 36rpx;
+			}
+		}
+	}
+
+	.upload-btn {
+		width: 200rpx;
+		height: 200rpx;
+		border: 2rpx dashed #D0D0D0;
+		border-radius: 12rpx;
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		justify-content: center;
+		background-color: #F8F8F8;
+
+		.upload-icon {
+			font-size: 60rpx;
+			color: #999;
+		}
+
+		.upload-text {
+			font-size: 24rpx;
+			color: #999;
+			margin-top: 10rpx;
+		}
+	}
+}
+
+.pet-selector,
+.location-selector {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	padding: 24rpx;
+	background-color: #F8F8F8;
+	border-radius: 12rpx;
+
+	.placeholder {
+		color: #999;
+	}
+
+	.arrow {
+		font-size: 32rpx;
+		color: #999;
+	}
+}
+
+.topic-input-group {
+	display: flex;
+	gap: 20rpx;
+	margin-bottom: 20rpx;
+
+	.topic-input {
+		flex: 1;
+		padding: 20rpx;
+		background-color: #F8F8F8;
+		border-radius: 12rpx;
+		font-size: 28rpx;
+	}
+
+	.add-topic-btn {
+		padding: 20rpx 40rpx;
+		background-color: #FF6B6B;
+		color: #FFFFFF;
+		border: none;
+		border-radius: 12rpx;
+		font-size: 28rpx;
+	}
+}
+
+.topic-list {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 20rpx;
+
+	.topic-tag {
+		display: inline-flex;
+		align-items: center;
+		gap: 10rpx;
+		padding: 12rpx 20rpx;
+		background-color: #FFE8E8;
+		color: #FF6B6B;
+		border-radius: 30rpx;
+		font-size: 26rpx;
+
+		.remove-topic {
+			font-size: 32rpx;
+			font-weight: bold;
+		}
+	}
+}
+
+.publish-footer {
+	background-color: #FFFFFF;
+	padding: 20rpx 30rpx;
+	border-top: 1rpx solid #F0F0F0;
+
+	.publish-btn {
+		width: 100%;
+		padding: 28rpx;
+		background-color: #FF6B6B;
+		color: #FFFFFF;
+		border: none;
+		border-radius: 12rpx;
+		font-size: 32rpx;
+		font-weight: 600;
+
+		&:disabled {
+			background-color: #D0D0D0;
+			color: #999;
+		}
+	}
+}
+</style>
