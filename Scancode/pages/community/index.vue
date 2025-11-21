@@ -27,10 +27,29 @@
 				<text class="tip-text">发现大家分享的萌宠瞬间</text>
 			</view>
 
+				<!-- 骨架屏加载 -->
+			<view class="photo-feed" v-if="loading && photos.length === 0">
+				<view class="feed-item skeleton-card" v-for="n in 3" :key="'skeleton-' + n">
+					<view class="item-header">
+						<view class="skeleton-avatar skeleton-animation"></view>
+						<view class="skeleton-info">
+							<view class="skeleton-line skeleton-animation" style="width: 120rpx; height: 30rpx;"></view>
+							<view class="skeleton-line skeleton-animation" style="width: 80rpx; height: 24rpx; margin-top: 10rpx;"></view>
+						</view>
+					</view>
+					<view class="skeleton-photo skeleton-animation"></view>
+					<view class="skeleton-actions">
+						<view class="skeleton-line skeleton-animation" style="width: 60rpx; height: 30rpx;"></view>
+						<view class="skeleton-line skeleton-animation" style="width: 60rpx; height: 30rpx;"></view>
+						<view class="skeleton-line skeleton-animation" style="width: 60rpx; height: 30rpx;"></view>
+					</view>
+				</view>
+			</view>
+
 			<!-- 照片流 -->
 			<view class="photo-feed" v-if="photos.length > 0">
 				<view
-					class="feed-item"
+					class="feed-item fade-in-scale"
 					v-for="(photo, index) in photos"
 					:key="photo._id"
 				>
@@ -38,10 +57,14 @@
 					<view class="item-header" @tap="viewUserAlbum(photo.userId)">
 						<view class="user-avatar-wrapper">
 							<image class="user-avatar" :src="photo.userAvatar" mode="aspectFill"></image>
+							<view class="avatar-ring"></view>
 						</view>
 						<view class="user-info">
 							<text class="user-name">{{ photo.userName }}</text>
 							<text class="post-time">{{ formatTime(photo.createTime) }}</text>
+						</view>
+						<view class="follow-btn">
+							<text>+关注</text>
 						</view>
 					</view>
 
@@ -52,18 +75,21 @@
 
 					<!-- 照片 -->
 					<view class="item-photo" @tap="previewPhoto(index)">
-						<image class="photo-img" :src="photo.url" mode="widthFix"></image>
+						<image class="photo-img" :src="photo.url" mode="widthFix" lazy-load></image>
+						<view class="photo-badge">
+							<text class="badge-icon">🐾</text>
+						</view>
 					</view>
 
 					<!-- 互动区 -->
 					<view class="item-actions">
-						<view class="action-item">
-							<text class="action-icon">👍</text>
-							<text class="action-text">赞</text>
+						<view class="action-item" @tap="toggleLike(index)">
+							<text class="action-icon">{{ photo.isLiked ? '❤️' : '🤍' }}</text>
+							<text class="action-text">{{ photo.likeCount || '赞' }}</text>
 						</view>
-						<view class="action-item">
+						<view class="action-item" @tap="showComments(index)">
 							<text class="action-icon">💬</text>
-							<text class="action-text">评论</text>
+							<text class="action-text">{{ photo.commentCount || '评论' }}</text>
 						</view>
 						<view class="action-item" @tap="sharePhoto(photo)">
 							<text class="action-icon">📤</text>
@@ -138,7 +164,12 @@ export default {
 				})
 
 				if (res.result.code === 0) {
-					const newPhotos = res.result.data.photos
+					const newPhotos = res.result.data.photos.map(photo => ({
+						...photo,
+						isLiked: false,
+						likeCount: photo.likeCount || 0,
+						commentCount: photo.commentCount || 0
+					}))
 
 					if (isRefresh) {
 						this.photos = newPhotos
@@ -189,6 +220,32 @@ export default {
 		viewUserAlbum(userId) {
 			uni.navigateTo({
 				url: `/pages/album/index?userId=${userId}`
+			})
+		},
+
+		// 点赞
+		toggleLike(index) {
+			const photo = this.photos[index]
+			if (!photo.isLiked) {
+				photo.isLiked = true
+				photo.likeCount = (photo.likeCount || 0) + 1
+				uni.showToast({
+					title: '❤️',
+					icon: 'none',
+					duration: 500
+				})
+			} else {
+				photo.isLiked = false
+				photo.likeCount = Math.max((photo.likeCount || 1) - 1, 0)
+			}
+			this.$forceUpdate()
+		},
+
+		// 显示评论
+		showComments(index) {
+			uni.showToast({
+				title: '评论功能开发中',
+				icon: 'none'
 			})
 		},
 
@@ -361,6 +418,59 @@ export default {
 	}
 }
 
+/* 骨架屏 */
+.skeleton-card {
+	.item-header {
+		display: flex;
+		align-items: center;
+		padding: 25rpx;
+
+		.skeleton-avatar {
+			width: 80rpx;
+			height: 80rpx;
+			border-radius: 50%;
+			background: #F5F5F5;
+			margin-right: 20rpx;
+		}
+
+		.skeleton-info {
+			flex: 1;
+		}
+	}
+
+	.skeleton-photo {
+		width: 100%;
+		height: 500rpx;
+		background: #F5F5F5;
+	}
+
+	.skeleton-actions {
+		display: flex;
+		justify-content: space-around;
+		padding: 20rpx 25rpx;
+	}
+}
+
+.skeleton-line {
+	background: #F5F5F5;
+	border-radius: 5rpx;
+}
+
+.skeleton-animation {
+	animation: skeleton-loading 1.5s ease-in-out infinite;
+	background: linear-gradient(90deg, #F5F5F5 25%, #E8E8E8 50%, #F5F5F5 75%);
+	background-size: 200% 100%;
+}
+
+@keyframes skeleton-loading {
+	0% {
+		background-position: 200% 0;
+	}
+	100% {
+		background-position: -200% 0;
+	}
+}
+
 /* 照片流 */
 .photo-feed {
 	.feed-item {
@@ -369,6 +479,11 @@ export default {
 		border-radius: 30rpx;
 		overflow: hidden;
 		box-shadow: 0 12rpx 40rpx rgba(255, 105, 180, 0.15);
+		transition: all 0.3s ease;
+
+		&:active {
+			transform: scale(0.98);
+		}
 
 		.item-header {
 			display: flex;
@@ -376,6 +491,7 @@ export default {
 			padding: 25rpx 25rpx 20rpx;
 
 			.user-avatar-wrapper {
+				position: relative;
 				margin-right: 20rpx;
 
 				.user-avatar {
@@ -383,6 +499,17 @@ export default {
 					height: 80rpx;
 					border-radius: 50%;
 					border: 4rpx solid #FFB6C1;
+				}
+
+				.avatar-ring {
+					position: absolute;
+					top: -6rpx;
+					left: -6rpx;
+					right: -6rpx;
+					bottom: -6rpx;
+					border-radius: 50%;
+					border: 2rpx solid rgba(255, 182, 193, 0.3);
+					animation: avatar-pulse 2s ease-in-out infinite;
 				}
 			}
 
@@ -403,6 +530,20 @@ export default {
 					color: #999;
 				}
 			}
+
+			.follow-btn {
+				padding: 10rpx 25rpx;
+				background: linear-gradient(135deg, #FFB6C1 0%, #FF69B4 100%);
+				color: #FFFFFF;
+				font-size: 24rpx;
+				font-weight: 600;
+				border-radius: 30rpx;
+				box-shadow: 0 4rpx 12rpx rgba(255, 105, 180, 0.3);
+
+				&:active {
+					opacity: 0.8;
+				}
+			}
 		}
 
 		.item-desc {
@@ -413,11 +554,32 @@ export default {
 		}
 
 		.item-photo {
+			position: relative;
 			width: 100%;
 
 			.photo-img {
 				width: 100%;
 				display: block;
+			}
+
+			.photo-badge {
+				position: absolute;
+				top: 15rpx;
+				right: 15rpx;
+				width: 60rpx;
+				height: 60rpx;
+				background: rgba(255, 255, 255, 0.9);
+				border-radius: 50%;
+				display: flex;
+				align-items: center;
+				justify-content: center;
+				backdrop-filter: blur(10rpx);
+				box-shadow: 0 4rpx 12rpx rgba(255, 105, 180, 0.2);
+
+				.badge-icon {
+					font-size: 32rpx;
+					animation: badge-float 3s ease-in-out infinite;
+				}
 			}
 		}
 
@@ -432,21 +594,66 @@ export default {
 				align-items: center;
 				justify-content: center;
 				gap: 8rpx;
+				padding: 10rpx;
+				border-radius: 20rpx;
+				transition: all 0.3s ease;
 
 				.action-icon {
 					font-size: 32rpx;
+					transition: transform 0.3s ease;
 				}
 
 				.action-text {
 					font-size: 26rpx;
 					color: #666;
+					font-weight: 600;
 				}
 
 				&:active {
-					opacity: 0.6;
+					background: rgba(255, 182, 193, 0.1);
+
+					.action-icon {
+						transform: scale(1.2);
+					}
 				}
 			}
 		}
+	}
+}
+
+@keyframes avatar-pulse {
+	0%, 100% {
+		transform: scale(1);
+		opacity: 0.3;
+	}
+	50% {
+		transform: scale(1.08);
+		opacity: 0.1;
+	}
+}
+
+@keyframes badge-float {
+	0%, 100% {
+		transform: translateY(0);
+	}
+	50% {
+		transform: translateY(-5rpx);
+	}
+}
+
+/* 淡入缩放动画 */
+.fade-in-scale {
+	animation: fade-in-scale 0.5s ease-out;
+}
+
+@keyframes fade-in-scale {
+	from {
+		opacity: 0;
+		transform: scale(0.95);
+	}
+	to {
+		opacity: 1;
+		transform: scale(1);
 	}
 }
 

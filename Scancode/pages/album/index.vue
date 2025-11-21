@@ -46,16 +46,17 @@
 			</view>
 
 			<!-- 照片列表 -->
-			<view class="photos-section" v-if="photos.length > 0">
+			<view class="photos-section" v-if="!loading && photos.length > 0">
 				<view class="section-tag">
 					<text class="tag-icon">🌟</text>
 					<text class="tag-text">精彩瞬间</text>
+					<text class="tag-count">{{ photos.length }} 张</text>
 				</view>
 
 				<!-- 瀑布流布局 -->
 				<view class="photo-waterfall">
 					<view
-						class="photo-item scale-up"
+						class="photo-item fade-in-up"
 						v-for="(photo, index) in photos"
 						:key="photo._id"
 						@tap="previewPhoto(index)"
@@ -65,10 +66,12 @@
 								class="photo-img"
 								:src="photo.url"
 								mode="widthFix"
+								lazy-load
 								@load="onImageLoad"
 							></image>
 							<view class="photo-overlay">
 								<view class="overlay-gradient"></view>
+								<view class="photo-index">#{{ index + 1 }}</view>
 							</view>
 						</view>
 						<view class="photo-info-card" v-if="photo.description || photo.petName">
@@ -489,9 +492,18 @@ export default {
 		}
 
 		.tag-text {
+			flex: 1;
 			font-size: 30rpx;
 			font-weight: 700;
 			color: #FF69B4;
+		}
+
+		.tag-count {
+			font-size: 24rpx;
+			color: #999;
+			background: rgba(255, 182, 193, 0.2);
+			padding: 6rpx 16rpx;
+			border-radius: 15rpx;
 		}
 	}
 
@@ -532,6 +544,20 @@ export default {
 						width: 100%;
 						height: 100%;
 						background: linear-gradient(to top, rgba(0, 0, 0, 0.1), transparent);
+					}
+
+					.photo-index {
+						position: absolute;
+						top: 10rpx;
+						left: 10rpx;
+						padding: 6rpx 16rpx;
+						background: rgba(255, 255, 255, 0.9);
+						color: #FF69B4;
+						font-size: 22rpx;
+						font-weight: 700;
+						border-radius: 15rpx;
+						backdrop-filter: blur(10rpx);
+						box-shadow: 0 4rpx 12rpx rgba(255, 105, 180, 0.2);
 					}
 				}
 			}
@@ -648,6 +674,22 @@ export default {
 }
 
 @keyframes fade-in {
+	from {
+		opacity: 0;
+		transform: translateY(30rpx);
+	}
+	to {
+		opacity: 1;
+		transform: translateY(0);
+	}
+}
+
+.fade-in-up {
+	animation: fade-in-up 0.5s ease-out;
+	animation-fill-mode: both;
+}
+
+@keyframes fade-in-up {
 	from {
 		opacity: 0;
 		transform: translateY(30rpx);

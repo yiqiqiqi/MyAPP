@@ -91,14 +91,37 @@
 							:disabled="uploading"
 							@tap="handleUpload"
 						>
-							{{ uploading ? '上传中...' : '发布' }}
+							<text class="btn-icon" v-if="!uploading">🚀</text>
+							<view class="btn-loading" v-if="uploading">
+								<view class="loading-spinner"></view>
+							</view>
+							<text>{{ uploading ? '上传中...' : '发布' }}</text>
 						</button>
+					</view>
+					<!-- 上传进度条 -->
+					<view class="upload-progress-bar" v-if="uploading && uploadProgress > 0">
+						<view class="progress-fill" :style="{ width: uploadProgress + '%' }"></view>
+						<text class="progress-text">{{ uploadProgress }}%</text>
+					</view>
+				</view>
+			</view>
+
+			<!-- 骨架屏加载 -->
+			<view class="history-section" v-if="loading">
+				<view class="section-header">
+					<text class="section-icon">🌈</text>
+					<text class="section-title">加载中...</text>
+				</view>
+				<view class="photo-waterfall">
+					<view class="skeleton-item" v-for="n in 6" :key="'skeleton-' + n">
+						<view class="skeleton-img skeleton-animation"></view>
+						<view class="skeleton-text skeleton-animation"></view>
 					</view>
 				</view>
 			</view>
 
 			<!-- 我的照片历史 -->
-			<view class="history-section" v-if="displayPhotos.length > 0">
+			<view class="history-section" v-if="!loading && displayPhotos.length > 0">
 				<view class="section-header">
 					<text class="section-icon">🌈</text>
 					<text class="section-title">
@@ -109,12 +132,12 @@
 
 				<view class="photo-waterfall">
 					<view
-						class="history-photo-item"
+						class="history-photo-item fade-in-up"
 						v-for="(photo, index) in displayPhotos"
 						:key="photo.id || photo._id"
 						@tap="previewPhoto(index)"
 					>
-						<image class="history-photo-img" :src="photo.url" mode="widthFix"></image>
+						<image class="history-photo-img" :src="photo.url" mode="widthFix" lazy-load></image>
 						<view class="photo-overlay">
 							<view class="photo-info">
 								<text class="photo-desc" v-if="photo.description">
@@ -124,15 +147,25 @@
 							</view>
 							<view class="photo-badge-temp" v-if="!userInfo">临时</view>
 						</view>
+						<!-- 新增：长按菜单触发 -->
+						<view class="photo-actions" @longpress="showPhotoMenu(index)">
+							<view class="action-dot"></view>
+						</view>
 					</view>
 				</view>
 			</view>
 
 			<!-- 空状态 -->
-			<view class="empty-state" v-if="displayPhotos.length === 0">
-				<text class="empty-icon pulse">📸</text>
+			<view class="empty-state" v-if="!loading && displayPhotos.length === 0">
+				<view class="empty-animation">
+					<text class="empty-icon pulse">📸</text>
+					<view class="empty-circle circle-1"></view>
+					<view class="empty-circle circle-2"></view>
+					<view class="empty-circle circle-3"></view>
+				</view>
 				<text class="empty-text">还没有照片哦</text>
 				<text class="empty-hint">快点击上方添加按钮上传吧~</text>
+				<text class="empty-tip">💡 小提示：最多可以一次上传9张照片</text>
 			</view>
 
 			<!-- 底部间距 -->
@@ -150,11 +183,13 @@ export default {
 			guestPhotos: [], // 游客照片
 			photoCount: 0,
 			refreshing: false,
+			loading: false, // 新增：加载状态
 
 			// 上传相关
 			selectedPhotos: [],
 			description: '',
-			uploading: false
+			uploading: false,
+			uploadProgress: 0 // 新增：上传进度
 		}
 	},
 	computed: {
@@ -236,6 +271,7 @@ export default {
 
 		// 加载云端照片
 		async loadPhotos() {
+			this.loading = true
 			try {
 				const userId = uni.getStorageSync('userId')
 				if (!userId) return
@@ -251,6 +287,12 @@ export default {
 				}
 			} catch (e) {
 				console.error('加载照片失败', e)
+				uni.showToast({
+					title: '加载失败，请重试',
+					icon: 'none'
+				})
+			} finally {
+				this.loading = false
 			}
 		},
 
@@ -480,6 +522,78 @@ export default {
 			const hour = date.getHours()
 			const minute = date.getMinutes()
 			return `${month}/${day} ${hour}:${minute < 10 ? '0' + minute : minute}`
+		},
+
+		// 显示照片菜单
+		showPhotoMenu(index) {
+			const photo = this.displayPhotos[index]
+			uni.showActionSheet({
+				itemList: ['查看大图', '分享', '删除'],
+				itemColor: '#FF69B4',
+				success: (res) => {
+					if (res.tapIndex === 0) {
+						this.previewPhoto(index)
+					} else if (res.tapIndex === 1) {
+						this.sharePhoto(photo)
+					} else if (res.tapIndex === 2) {
+						this.deletePhotoConfirm(index)
+					}
+				}
+			})
+		},
+
+		// 分享照片
+		sharePhoto(photo) {
+			uni.showShareMenu({
+				withShareTicket: true
+			})
+			uni.showToast({
+				title: '点击右上角分享',
+				icon: 'none'
+			})
+		},
+
+		// 删除照片确认
+		deletePhotoConfirm(index) {
+			uni.showModal({
+				title: '确认删除',
+				content: '确定要删除这张照片吗？',
+				confirmColor: '#FF69B4',
+				success: (res) => {
+					if (res.confirm) {
+						this.deletePhotoItem(index)
+					}
+				}
+			})
+		},
+
+		// 删除照片
+		async deletePhotoItem(index) {
+			try {
+				if (this.userInfo) {
+					// 云端照片删除
+					this.photos.splice(index, 1)
+					this.photoCount = this.photos.length
+					uni.showToast({
+						title: '删除成功',
+						icon: 'success'
+					})
+				} else {
+					// 本地照片删除
+					this.guestPhotos.splice(index, 1)
+					uni.setStorageSync('guestPhotos', this.guestPhotos)
+					uni.showToast({
+						title: '删除成功',
+						icon: 'success'
+					})
+				}
+			} catch (e) {
+				console.error('删除失败', e)
+				uni.showToast({
+					title: '删除失败',
+					icon: 'none'
+				})
+			}
 		}
 	}
 }
@@ -909,6 +1023,210 @@ export default {
 	}
 	50% {
 		transform: scale(1.1);
+	}
+}
+
+/* 骨架屏 */
+.skeleton-item {
+	break-inside: avoid;
+	margin-bottom: 15rpx;
+	background: #FFFFFF;
+	border-radius: 20rpx;
+	overflow: hidden;
+	box-shadow: 0 6rpx 20rpx rgba(255, 105, 180, 0.15);
+
+	.skeleton-img {
+		width: 100%;
+		height: 300rpx;
+		background: #F5F5F5;
+	}
+
+	.skeleton-text {
+		margin: 15rpx;
+		height: 30rpx;
+		width: 80%;
+		background: #F5F5F5;
+		border-radius: 5rpx;
+	}
+}
+
+.skeleton-animation {
+	animation: skeleton-loading 1.5s ease-in-out infinite;
+	background: linear-gradient(90deg, #F5F5F5 25%, #E8E8E8 50%, #F5F5F5 75%);
+	background-size: 200% 100%;
+}
+
+@keyframes skeleton-loading {
+	0% {
+		background-position: 200% 0;
+	}
+	100% {
+		background-position: -200% 0;
+	}
+}
+
+/* 淡入动画 */
+.fade-in-up {
+	animation: fade-in-up 0.5s ease-out;
+}
+
+@keyframes fade-in-up {
+	from {
+		opacity: 0;
+		transform: translateY(30rpx);
+	}
+	to {
+		opacity: 1;
+		transform: translateY(0);
+	}
+}
+
+/* 照片操作点 */
+.photo-actions {
+	position: absolute;
+	top: 10rpx;
+	right: 10rpx;
+	width: 50rpx;
+	height: 50rpx;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	background: rgba(0, 0, 0, 0.5);
+	border-radius: 50%;
+	backdrop-filter: blur(10rpx);
+
+	.action-dot {
+		width: 6rpx;
+		height: 6rpx;
+		background: #FFFFFF;
+		border-radius: 50%;
+		box-shadow:
+			0 -10rpx 0 #FFFFFF,
+			0 10rpx 0 #FFFFFF;
+	}
+}
+
+/* 上传进度条 */
+.upload-progress-bar {
+	position: relative;
+	margin-top: 20rpx;
+	height: 8rpx;
+	background: rgba(255, 182, 193, 0.2);
+	border-radius: 10rpx;
+	overflow: hidden;
+
+	.progress-fill {
+		position: absolute;
+		left: 0;
+		top: 0;
+		height: 100%;
+		background: linear-gradient(90deg, #FFB6C1 0%, #FF69B4 100%);
+		border-radius: 10rpx;
+		transition: width 0.3s ease;
+	}
+
+	.progress-text {
+		position: absolute;
+		right: 10rpx;
+		top: -30rpx;
+		font-size: 22rpx;
+		color: #FF69B4;
+		font-weight: 600;
+	}
+}
+
+/* 上传按钮加载动画 */
+.upload-btn {
+	position: relative;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	gap: 8rpx;
+
+	.btn-icon {
+		font-size: 28rpx;
+	}
+
+	.btn-loading {
+		.loading-spinner {
+			width: 24rpx;
+			height: 24rpx;
+			border: 3rpx solid rgba(255, 255, 255, 0.3);
+			border-top-color: #FFFFFF;
+			border-radius: 50%;
+			animation: spin 0.8s linear infinite;
+		}
+	}
+}
+
+@keyframes spin {
+	to {
+		transform: rotate(360deg);
+	}
+}
+
+/* 空状态动画优化 */
+.empty-state {
+	position: relative;
+
+	.empty-animation {
+		position: relative;
+		width: 200rpx;
+		height: 200rpx;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		margin: 0 auto 30rpx;
+
+		.empty-icon {
+			position: relative;
+			z-index: 2;
+		}
+
+		.empty-circle {
+			position: absolute;
+			border-radius: 50%;
+			border: 3rpx solid rgba(255, 182, 193, 0.3);
+		}
+
+		.circle-1 {
+			width: 120rpx;
+			height: 120rpx;
+			animation: circle-pulse 3s ease-in-out infinite;
+		}
+
+		.circle-2 {
+			width: 160rpx;
+			height: 160rpx;
+			animation: circle-pulse 3s ease-in-out 1s infinite;
+		}
+
+		.circle-3 {
+			width: 200rpx;
+			height: 200rpx;
+			animation: circle-pulse 3s ease-in-out 2s infinite;
+		}
+	}
+
+	.empty-tip {
+		display: block;
+		margin-top: 15rpx;
+		font-size: 22rpx;
+		color: #FFB6C1;
+		background: rgba(255, 182, 193, 0.1);
+		padding: 15rpx 30rpx;
+		border-radius: 20rpx;
+	}
+}
+
+@keyframes circle-pulse {
+	0%, 100% {
+		transform: scale(1);
+		opacity: 0.3;
+	}
+	50% {
+		transform: scale(1.2);
+		opacity: 0.1;
 	}
 }
 
