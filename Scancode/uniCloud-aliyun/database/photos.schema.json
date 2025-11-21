@@ -1,0 +1,52 @@
+{
+  "bsonType": "object",
+  "required": ["userId", "url"],
+  "permission": {
+    "read": true,
+    "create": false,
+    "update": false,
+    "delete": false
+  },
+  "properties": {
+    "_id": {
+      "description": "ID，系统自动生成"
+    },
+    "userId": {
+      "bsonType": "string",
+      "description": "用户ID",
+      "title": "用户ID"
+    },
+    "fileID": {
+      "bsonType": "string",
+      "description": "云存储文件ID",
+      "title": "文件ID"
+    },
+    "url": {
+      "bsonType": "string",
+      "description": "照片URL",
+      "title": "照片URL"
+    },
+    "description": {
+      "bsonType": "string",
+      "description": "照片描述",
+      "title": "描述"
+    },
+    "petName": {
+      "bsonType": "string",
+      "description": "宠物名字",
+      "title": "宠物名字"
+    },
+    "petType": {
+      "bsonType": "string",
+      "description": "宠物类型",
+      "title": "宠物类型"
+    },
+    "createTime": {
+      "bsonType": "timestamp",
+      "description": "创建时间",
+      "forceDefaultValue": {
+        "$env": "now"
+      }
+    }
+  }
+}
