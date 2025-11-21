@@ -9,33 +9,17 @@
 			}
 		},
 		{
-			"path": "pages/upload/index",
+			"path": "pages/community/index",
 			"style": {
-				"navigationBarTitleText": "上传照片",
-				"navigationBarTextStyle": "black",
-				"navigationBarBackgroundColor": "#FFB6C1"
+				"navigationBarTitleText": "宠物朋友圈",
+				"navigationStyle": "custom",
+				"enablePullDownRefresh": true
 			}
 		},
 		{
 			"path": "pages/album/index",
 			"style": {
-				"navigationBarTitleText": "宠物相册",
-				"navigationBarTextStyle": "black",
-				"navigationBarBackgroundColor": "#FFB6C1"
-			}
-		},
-		{
-			"path": "pages/profile/index",
-			"style": {
-				"navigationBarTitleText": "个人中心",
-				"navigationBarTextStyle": "black",
-				"navigationBarBackgroundColor": "#FFB6C1"
-			}
-		},
-		{
-			"path": "pages/about/index",
-			"style": {
-				"navigationBarTitleText": "关于我们",
+				"navigationBarTitleText": "TA的相册",
 				"navigationBarTextStyle": "black",
 				"navigationBarBackgroundColor": "#FFB6C1"
 			}
@@ -59,12 +43,8 @@
 				"text": "我的相册"
 			},
 			{
-				"pagePath": "pages/upload/index",
-				"text": "上传照片"
-			},
-			{
-				"pagePath": "pages/profile/index",
-				"text": "我的"
+				"pagePath": "pages/community/index",
+				"text": "宠物圈"
 			}
 		]
 	},
