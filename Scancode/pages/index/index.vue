@@ -245,23 +245,39 @@ export default {
 		// 微信登录
 		async handleLogin() {
 			try {
-				const [error, res] = await uni.getUserProfile({
-					desc: '用于展示个人信息',
-					lang: 'zh_CN'
+				// 1. 获取用户信息授权
+				const userProfile = await new Promise((resolve, reject) => {
+					uni.getUserProfile({
+						desc: '用于展示个人信息',
+						lang: 'zh_CN',
+						success: (res) => resolve(res),
+						fail: (err) => reject(err)
+					})
 				})
 
-				if (error) {
-					uni.showToast({ title: '登录取消', icon: 'none' })
+				// 2. 调用微信登录获取 code
+				const loginResult = await new Promise((resolve, reject) => {
+					uni.login({
+						provider: 'weixin',
+						success: (res) => resolve(res),
+						fail: (err) => reject(err)
+					})
+				})
+
+				if (!loginResult.code) {
+					uni.showToast({
+						title: '登录失败，请重试',
+						icon: 'none'
+					})
 					return
 				}
 
-				const loginRes = await uni.login()
-
+				// 3. 调用云函数进行登录
 				const result = await uniCloud.callFunction({
 					name: 'user-login',
 					data: {
-						code: loginRes[1].code,
-						userInfo: res.userInfo
+						code: loginResult.code,
+						userInfo: userProfile.userInfo
 					}
 				})
 
@@ -271,19 +287,32 @@ export default {
 					uni.setStorageSync('userId', result.result.data.userId)
 
 					uni.showToast({
-						title: '登录成功',
+						title: '登录成功 ✨',
 						icon: 'success'
 					})
 
+					// 加载云端照片并迁移游客照片
 					await this.loadPhotos()
 					await this.migrateGuestPhotos()
+				} else {
+					uni.showToast({
+						title: result.result.msg || '登录失败',
+						icon: 'none'
+					})
 				}
 			} catch (e) {
 				console.error('登录失败', e)
-				uni.showToast({
-					title: '登录失败，请重试',
-					icon: 'none'
-				})
+				if (e.errMsg && e.errMsg.includes('cancel')) {
+					uni.showToast({
+						title: '登录已取消',
+						icon: 'none'
+					})
+				} else {
+					uni.showToast({
+						title: '登录失败，请重试',
+						icon: 'none'
+					})
+				}
 			}
 		},
 
