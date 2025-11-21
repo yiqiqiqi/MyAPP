@@ -129,6 +129,54 @@
 			<!-- 底部间距 -->
 			<view class="bottom-space"></view>
 		</scroll-view>
+
+		<!-- 评论弹窗 -->
+		<view class="comment-modal" v-if="showCommentModal" @tap="closeCommentModal">
+			<view class="modal-content" @tap.stop>
+				<view class="modal-header">
+					<text class="modal-title">💬 评论</text>
+					<text class="close-btn" @tap="closeCommentModal">✕</text>
+				</view>
+
+				<!-- 评论列表 -->
+				<scroll-view class="comment-list" scroll-y>
+					<view class="comment-item" v-for="comment in comments" :key="comment._id">
+						<image class="comment-avatar" :src="comment.userAvatar" mode="aspectFill"></image>
+						<view class="comment-content-wrapper">
+							<view class="comment-header">
+								<text class="comment-user">{{ comment.userName }}</text>
+								<text class="comment-time">{{ formatTime(comment.createTime) }}</text>
+							</view>
+							<text class="comment-text">{{ comment.content }}</text>
+						</view>
+					</view>
+
+					<view class="no-comments" v-if="!loadingComments && comments.length === 0">
+						<text class="no-comments-text">暂无评论，快来抢沙发~</text>
+					</view>
+
+					<view class="loading-comments" v-if="loadingComments">
+						<view class="loading-spinner"></view>
+						<text class="loading-text">加载中...</text>
+					</view>
+				</scroll-view>
+
+				<!-- 评论输入框 -->
+				<view class="comment-input-wrapper">
+					<input
+						class="comment-input"
+						v-model="commentText"
+						placeholder="说点什么吧..."
+						:adjust-position="true"
+						confirm-type="send"
+						@confirm="submitComment"
+					/>
+					<button class="send-btn" @tap="submitComment" :disabled="!commentText.trim()">
+						发送
+					</button>
+				</view>
+			</view>
+		</view>
 	</view>
 </template>
 
@@ -141,10 +189,18 @@ export default {
 			refreshing: false,
 			page: 1,
 			pageSize: 10,
-			hasMore: true
+			hasMore: true,
+			currentUserId: '',
+			showCommentModal: false,
+			currentPhotoIndex: -1,
+			comments: [],
+			commentText: '',
+			loadingComments: false
 		}
 	},
 	onLoad() {
+		// 获取当前用户ID
+		this.currentUserId = uni.getStorageSync('userId') || ''
 		this.loadPhotos()
 	},
 	methods: {
@@ -170,6 +226,25 @@ export default {
 						likeCount: photo.likeCount || 0,
 						commentCount: photo.commentCount || 0
 					}))
+
+					// 获取点赞状态
+					if (this.currentUserId && newPhotos.length > 0) {
+						const photoIds = newPhotos.map(p => p._id)
+						const likesRes = await uniCloud.callFunction({
+							name: 'get-likes',
+							data: {
+								userId: this.currentUserId,
+								photoIds: photoIds
+							}
+						})
+
+						if (likesRes.result.code === 0) {
+							const likedPhotoIds = likesRes.result.data.likedPhotoIds
+							newPhotos.forEach(photo => {
+								photo.isLiked = likedPhotoIds.includes(photo._id)
+							})
+						}
+					}
 
 					if (isRefresh) {
 						this.photos = newPhotos
@@ -224,29 +299,173 @@ export default {
 		},
 
 		// 点赞
-		toggleLike(index) {
+		async toggleLike(index) {
+			if (!this.currentUserId) {
+				uni.showToast({
+					title: '请先登录',
+					icon: 'none'
+				})
+				return
+			}
+
 			const photo = this.photos[index]
-			if (!photo.isLiked) {
-				photo.isLiked = true
-				photo.likeCount = (photo.likeCount || 0) + 1
+			const originalLiked = photo.isLiked
+			const originalCount = photo.likeCount
+
+			// 乐观更新UI
+			photo.isLiked = !originalLiked
+			photo.likeCount = originalLiked
+				? Math.max((originalCount || 1) - 1, 0)
+				: (originalCount || 0) + 1
+			this.$forceUpdate()
+
+			if (!originalLiked) {
 				uni.showToast({
 					title: '❤️',
 					icon: 'none',
 					duration: 500
 				})
-			} else {
-				photo.isLiked = false
-				photo.likeCount = Math.max((photo.likeCount || 1) - 1, 0)
 			}
-			this.$forceUpdate()
+
+			try {
+				const res = await uniCloud.callFunction({
+					name: 'toggle-like',
+					data: {
+						userId: this.currentUserId,
+						photoId: photo._id
+					}
+				})
+
+				if (res.result.code === 0) {
+					// 更新为服务器返回的准确数据
+					photo.isLiked = res.result.data.isLiked
+					photo.likeCount = res.result.data.likeCount
+					this.$forceUpdate()
+				} else {
+					// 失败则回滚
+					photo.isLiked = originalLiked
+					photo.likeCount = originalCount
+					this.$forceUpdate()
+					uni.showToast({
+						title: res.result.msg || '操作失败',
+						icon: 'none'
+					})
+				}
+			} catch (error) {
+				// 失败则回滚
+				photo.isLiked = originalLiked
+				photo.likeCount = originalCount
+				this.$forceUpdate()
+				console.error('点赞失败', error)
+				uni.showToast({
+					title: '操作失败',
+					icon: 'none'
+				})
+			}
 		},
 
 		// 显示评论
-		showComments(index) {
-			uni.showToast({
-				title: '评论功能开发中',
-				icon: 'none'
-			})
+		async showComments(index) {
+			this.currentPhotoIndex = index
+			this.showCommentModal = true
+			this.comments = []
+			this.commentText = ''
+			await this.loadComments()
+		},
+
+		// 关闭评论弹窗
+		closeCommentModal() {
+			this.showCommentModal = false
+			this.currentPhotoIndex = -1
+			this.comments = []
+			this.commentText = ''
+		},
+
+		// 加载评论
+		async loadComments() {
+			if (this.currentPhotoIndex < 0) return
+
+			this.loadingComments = true
+
+			try {
+				const photo = this.photos[this.currentPhotoIndex]
+				const res = await uniCloud.callFunction({
+					name: 'get-comments',
+					data: {
+						photoId: photo._id,
+						page: 1,
+						pageSize: 50
+					}
+				})
+
+				if (res.result.code === 0) {
+					this.comments = res.result.data.comments
+				}
+			} catch (error) {
+				console.error('加载评论失败', error)
+			} finally {
+				this.loadingComments = false
+			}
+		},
+
+		// 提交评论
+		async submitComment() {
+			if (!this.currentUserId) {
+				uni.showToast({
+					title: '请先登录',
+					icon: 'none'
+				})
+				return
+			}
+
+			if (!this.commentText.trim()) {
+				return
+			}
+
+			if (this.currentPhotoIndex < 0) return
+
+			const photo = this.photos[this.currentPhotoIndex]
+			const content = this.commentText.trim()
+
+			try {
+				const res = await uniCloud.callFunction({
+					name: 'add-comment',
+					data: {
+						userId: this.currentUserId,
+						photoId: photo._id,
+						content: content
+					}
+				})
+
+				if (res.result.code === 0) {
+					uni.showToast({
+						title: '评论成功',
+						icon: 'success',
+						duration: 1000
+					})
+
+					// 更新评论数
+					photo.commentCount = (photo.commentCount || 0) + 1
+					this.$forceUpdate()
+
+					// 清空输入框
+					this.commentText = ''
+
+					// 重新加载评论
+					await this.loadComments()
+				} else {
+					uni.showToast({
+						title: res.result.msg || '评论失败',
+						icon: 'none'
+					})
+				}
+			} catch (error) {
+				console.error('评论失败', error)
+				uni.showToast({
+					title: '评论失败',
+					icon: 'none'
+				})
+			}
 		},
 
 		// 分享照片
@@ -772,5 +991,173 @@ export default {
 
 .bottom-space {
 	height: 60rpx;
+}
+
+/* 评论弹窗 */
+.comment-modal {
+	position: fixed;
+	top: 0;
+	left: 0;
+	right: 0;
+	bottom: 0;
+	background: rgba(0, 0, 0, 0.5);
+	z-index: 2000;
+	display: flex;
+	align-items: flex-end;
+
+	.modal-content {
+		width: 100%;
+		max-height: 80vh;
+		background: #FFFFFF;
+		border-radius: 30rpx 30rpx 0 0;
+		display: flex;
+		flex-direction: column;
+		animation: slide-up 0.3s ease-out;
+	}
+
+	.modal-header {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		padding: 30rpx;
+		border-bottom: 1rpx solid #F5F5F5;
+
+		.modal-title {
+			font-size: 32rpx;
+			font-weight: 700;
+			color: #FF69B4;
+		}
+
+		.close-btn {
+			font-size: 40rpx;
+			color: #999;
+			padding: 0 10rpx;
+		}
+	}
+
+	.comment-list {
+		flex: 1;
+		padding: 20rpx 30rpx;
+		overflow-y: auto;
+
+		.comment-item {
+			display: flex;
+			padding: 20rpx 0;
+			border-bottom: 1rpx solid #F8F8F8;
+
+			.comment-avatar {
+				width: 60rpx;
+				height: 60rpx;
+				border-radius: 50%;
+				margin-right: 15rpx;
+				flex-shrink: 0;
+			}
+
+			.comment-content-wrapper {
+				flex: 1;
+
+				.comment-header {
+					display: flex;
+					align-items: center;
+					justify-content: space-between;
+					margin-bottom: 8rpx;
+
+					.comment-user {
+						font-size: 26rpx;
+						font-weight: 600;
+						color: #FF69B4;
+					}
+
+					.comment-time {
+						font-size: 22rpx;
+						color: #999;
+					}
+				}
+
+				.comment-text {
+					font-size: 28rpx;
+					color: #333;
+					line-height: 1.6;
+					word-break: break-all;
+				}
+			}
+		}
+
+		.no-comments {
+			padding: 80rpx 0;
+			text-align: center;
+
+			.no-comments-text {
+				font-size: 28rpx;
+				color: #999;
+			}
+		}
+
+		.loading-comments {
+			padding: 60rpx 0;
+			display: flex;
+			flex-direction: column;
+			align-items: center;
+
+			.loading-spinner {
+				width: 50rpx;
+				height: 50rpx;
+				border: 4rpx solid rgba(255, 182, 193, 0.3);
+				border-top-color: #FF69B4;
+				border-radius: 50%;
+				animation: spin 1s linear infinite;
+				margin-bottom: 20rpx;
+			}
+
+			.loading-text {
+				font-size: 26rpx;
+				color: #999;
+			}
+		}
+	}
+
+	.comment-input-wrapper {
+		display: flex;
+		align-items: center;
+		padding: 20rpx 30rpx;
+		padding-bottom: calc(20rpx + env(safe-area-inset-bottom));
+		border-top: 1rpx solid #F5F5F5;
+		background: #FFFFFF;
+
+		.comment-input {
+			flex: 1;
+			height: 70rpx;
+			padding: 0 20rpx;
+			background: #F8F8F8;
+			border-radius: 35rpx;
+			font-size: 28rpx;
+		}
+
+		.send-btn {
+			margin-left: 15rpx;
+			padding: 0 30rpx;
+			height: 70rpx;
+			line-height: 70rpx;
+			background: linear-gradient(135deg, #FFB6C1 0%, #FF69B4 100%);
+			color: #FFFFFF;
+			font-size: 28rpx;
+			font-weight: 600;
+			border-radius: 35rpx;
+			border: none;
+
+			&[disabled] {
+				opacity: 0.5;
+			}
+		}
+	}
+}
+
+@keyframes slide-up {
+	from {
+		transform: translateY(100%);
+	}
+	to {
+		transform: translateY(0);
+	}
 }
 </style>

@@ -1,10 +1,10 @@
 'use strict';
 
 exports.main = async (event, context) => {
-	const { userId, page = 1, pageSize = 20 } = event
+	const { photoId, page = 1, pageSize = 20 } = event
 
 	try {
-		if (!userId) {
+		if (!photoId) {
 			return {
 				code: -1,
 				msg: '参数错误'
@@ -12,16 +12,16 @@ exports.main = async (event, context) => {
 		}
 
 		const db = uniCloud.database()
-		const photosCollection = db.collection('photos')
+		const commentsCollection = db.collection('comments')
 
 		// 计算分页参数
 		const skip = (page - 1) * pageSize
 		const limit = pageSize
 
-		// 查询用户的照片，支持分页
-		const res = await photosCollection
+		// 查询评论，按时间倒序
+		const res = await commentsCollection
 			.where({
-				userId: userId
+				photoId: photoId
 			})
 			.orderBy('createTime', 'desc')
 			.skip(skip)
@@ -29,9 +29,9 @@ exports.main = async (event, context) => {
 			.get()
 
 		// 获取总数
-		const countRes = await photosCollection
+		const countRes = await commentsCollection
 			.where({
-				userId: userId
+				photoId: photoId
 			})
 			.count()
 
@@ -39,7 +39,7 @@ exports.main = async (event, context) => {
 			code: 0,
 			msg: '获取成功',
 			data: {
-				photos: res.data,
+				comments: res.data,
 				total: countRes.total,
 				page: page,
 				pageSize: pageSize,
@@ -47,7 +47,7 @@ exports.main = async (event, context) => {
 			}
 		}
 	} catch (error) {
-		console.error('获取照片失败', error)
+		console.error('获取评论失败', error)
 		return {
 			code: -1,
 			msg: '获取失败：' + error.message

@@ -19,6 +19,7 @@
 			:refresher-enabled="true"
 			:refresher-triggered="refreshing"
 			@refresherrefresh="onRefresh"
+			@scrolltolower="loadMorePhotos"
 		>
 			<!-- 用户信息卡片 -->
 			<view class="user-card" v-if="userInfo">
@@ -155,6 +156,17 @@
 				</view>
 			</view>
 
+			<!-- 加载更多 -->
+			<view class="load-more" v-if="userInfo && hasMore && photos.length > 0 && !loading">
+				<view class="loading-spinner" v-if="loadingMore"></view>
+				<text class="load-text">{{ loadingMore ? '加载中...' : '上拉加载更多' }}</text>
+			</view>
+
+			<!-- 没有更多 -->
+			<view class="no-more" v-if="userInfo && !hasMore && photos.length > 0 && !loading">
+				<text class="no-more-text">🌸 已经到底啦 🌸</text>
+			</view>
+
 			<!-- 空状态 -->
 			<view class="empty-state" v-if="!loading && displayPhotos.length === 0">
 				<view class="empty-animation">
@@ -184,6 +196,12 @@ export default {
 			photoCount: 0,
 			refreshing: false,
 			loading: false, // 新增：加载状态
+
+			// 分页相关
+			page: 1,
+			pageSize: 20,
+			hasMore: true,
+			loadingMore: false,
 
 			// 上传相关
 			selectedPhotos: [],
@@ -270,20 +288,38 @@ export default {
 		},
 
 		// 加载云端照片
-		async loadPhotos() {
-			this.loading = true
+		async loadPhotos(isRefresh = false) {
+			if (isRefresh) {
+				this.loading = true
+			} else {
+				this.loadingMore = true
+			}
+
 			try {
 				const userId = uni.getStorageSync('userId')
 				if (!userId) return
 
 				const res = await uniCloud.callFunction({
 					name: 'get-photos',
-					data: { userId }
+					data: {
+						userId,
+						page: isRefresh ? 1 : this.page,
+						pageSize: this.pageSize
+					}
 				})
 
 				if (res.result.code === 0) {
-					this.photos = res.result.data.photos
-					this.photoCount = this.photos.length
+					const newPhotos = res.result.data.photos || []
+
+					if (isRefresh) {
+						this.photos = newPhotos
+						this.page = 1
+					} else {
+						this.photos.push(...newPhotos)
+					}
+
+					this.photoCount = res.result.data.total || this.photos.length
+					this.hasMore = newPhotos.length === this.pageSize
 				}
 			} catch (e) {
 				console.error('加载照片失败', e)
@@ -293,7 +329,18 @@ export default {
 				})
 			} finally {
 				this.loading = false
+				this.loadingMore = false
 			}
+		},
+
+		// 加载更多照片
+		loadMorePhotos() {
+			if (!this.userInfo || !this.hasMore || this.loadingMore || this.loading) {
+				return
+			}
+
+			this.page++
+			this.loadPhotos(false)
 		},
 
 		// 加载本地照片
@@ -427,21 +474,30 @@ export default {
 		// 云端上传
 		async handleCloudUpload(userId) {
 			this.uploading = true
+			this.uploadProgress = 0
 
 			try {
 				uni.showLoading({ title: '上传中...', mask: true })
 
 				const uploadedUrls = []
+				const total = this.selectedPhotos.length
 
 				for (let i = 0; i < this.selectedPhotos.length; i++) {
 					const photo = this.selectedPhotos[i]
+
+					// 更新进度
+					this.uploadProgress = Math.floor(((i + 0.5) / total) * 100)
+
+					// 压缩图片
+					const compressedPath = await this.compressImage(photo)
+
 					const timestamp = Date.now()
 					const random = Math.random().toString(36).substr(2, 9)
-					const ext = photo.split('.').pop()
+					const ext = compressedPath.split('.').pop()
 					const cloudPath = `pet-photos/${userId}/${timestamp}_${random}.${ext}`
 
 					const uploadRes = await uniCloud.uploadFile({
-						filePath: photo,
+						filePath: compressedPath,
 						cloudPath: cloudPath
 					})
 
@@ -457,6 +513,9 @@ export default {
 							})
 						}
 					}
+
+					// 更新进度
+					this.uploadProgress = Math.floor(((i + 1) / total) * 100)
 				}
 
 				const result = await uniCloud.callFunction({
@@ -480,7 +539,9 @@ export default {
 
 					this.selectedPhotos = []
 					this.description = ''
-					await this.loadPhotos()
+					this.uploadProgress = 0
+					this.page = 1
+					await this.loadPhotos(true)
 				}
 			} catch (error) {
 				console.error('上传失败', error)
@@ -491,14 +552,34 @@ export default {
 				})
 			} finally {
 				this.uploading = false
+				this.uploadProgress = 0
 			}
+		},
+
+		// 压缩图片
+		async compressImage(filePath) {
+			return new Promise((resolve, reject) => {
+				uni.compressImage({
+					src: filePath,
+					quality: 80,
+					compressedWidth: 1200,
+					success: (res) => {
+						resolve(res.tempFilePath)
+					},
+					fail: (err) => {
+						console.warn('图片压缩失败，使用原图', err)
+						resolve(filePath)
+					}
+				})
+			})
 		},
 
 		// 下拉刷新
 		async onRefresh() {
 			this.refreshing = true
+			this.page = 1
 			if (this.userInfo) {
-				await this.loadPhotos()
+				await this.loadPhotos(true)
 			} else {
 				this.loadLocalPhotos()
 			}
@@ -1227,6 +1308,39 @@ export default {
 	50% {
 		transform: scale(1.2);
 		opacity: 0.1;
+	}
+}
+
+/* 加载更多 */
+.load-more {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	padding: 40rpx 0;
+
+	.loading-spinner {
+		width: 40rpx;
+		height: 40rpx;
+		border: 4rpx solid rgba(255, 182, 193, 0.3);
+		border-top-color: #FF69B4;
+		border-radius: 50%;
+		animation: spin 1s linear infinite;
+		margin-right: 15rpx;
+	}
+
+	.load-text {
+		font-size: 26rpx;
+		color: #999;
+	}
+}
+
+.no-more {
+	padding: 40rpx 0;
+	text-align: center;
+
+	.no-more-text {
+		font-size: 26rpx;
+		color: #FFB6C1;
 	}
 }
 
